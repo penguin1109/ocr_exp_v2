@@ -1,0 +1,32 @@
+DATA_CFG:
+  MIN_V_OVERLAPS: !!float 0.7
+  MIN_SIZE_SIM: !!float 0.7
+  MAX_HORI_GAP: !!int 20
+  CONF_SCORE: !!float 0.9
+  IOU_THRESH: !!float 0.2
+  ANCHOR_SHIFT: !!int 16
+  FEATURE_STRIDE: !!int 16
+  ANCHOR_HEIGHTS: 
+    - 7
+    - 11
+    - 15
+    - 19
+    - 22
+    - 26
+    - 32
+    - 45
+    - 73
+    - 93
+
+TRAIN_CFG:
+  MIN_SOCRE: !!float 0.9
+  NMS_THRESH: !!float 0.3
+  REFINEMENT: !!bool False
+  LOSS_LAMBDA_REG: !!float 2.0
+  LOSS_LAMBDA_CLS: !!float 1.0
+  LOSS_LAMBDA_REFINE: !!float 2.0 ## regression loss의 lambda와 동일한 비율
+  ANCHOR_IGNORE_LABEL: -1
+  ANCHOR_POSITIVE_LABEL: 1
+  ANCHOR_NEGATIVE_LABEL: 0
+  IOU_OVERLAP_THRESH_POS: !!float 0.5
+  IOU_OVERLAP_THRESH_NEG: !!float 0.3
