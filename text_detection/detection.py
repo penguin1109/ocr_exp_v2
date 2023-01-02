@@ -4,22 +4,14 @@ import torch
 import torch.nn as nn
 from torchvision import transforms
 import os, sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from preprocess import *
 from loguru import logger
 import numpy as np
 STD = [0.20037157, 0.18366718, 0.19631825]
 MEAN = [0.90890862, 0.91631571, 0.90724233]
 BASE = '/content/drive/MyDrive/SpeakingFridgey/model_weights/detection'
-import cv2
-import matplotlib.pyplot as plt
-import torch
-import torch.nn as nn
-from torchvision import transforms
-import os, sys
-from loguru import logger
 
-STD = [0.20037157, 0.18366718, 0.19631825]
-MEAN = [0.90890862, 0.91631571, 0.90724233]
-BASE = '/content/drive/MyDrive/SpeakingFridgey/model_weights/detection'
 
 def load_weight(weight_name, model):
   pretrained = torch.load(os.path.join(BASE, weight_name))
