@@ -45,7 +45,7 @@ def split_syllables(s, ignore_err=True, pad=None):
         try:
             return split_syllable_char(c)
         except:
-            replace = re.sub('[ sA-Za-z0-9]', '', c) ## 영어나 숫자나 공백 
+            replace = re.sub('[ sA-Za-z0-9,.()]', '', c) ## 영어나 숫자나 공백 
             if replace == '':
                 return (c,)
             else:

@@ -43,7 +43,7 @@ def join_jamos(s: str, ignore_err=True):
             if queue:
                 new_c = flush() + char
             else:
-                if re.sub('[A-Za-z0-9]', '', char) == '': ## 숫자, 영어 인 경우
+                if re.sub(' [A-Za-z0-9,.()]', '', char) == '': ## 숫자, 영어 인 경우
                     new_c = char
                 else: ## 특수 문자인 경우
                     new_c = ''

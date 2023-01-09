@@ -38,12 +38,13 @@ class MultiHeadAttention(nn.Module):
     assert self.head_dim * self.head_num == self.embed_dim, "The Embedding Dimension Should be divisable by number of heads"
 
 
-    self.in_proj_weight = nn.Parameter(torch.empty(3 * self.embed_dim, self.embed_dim))
+    #self.in_proj_weight = nn.Parameter(torch.empty(3 * self.embed_dim, self.embed_dim))
     self.register_parameter('q_proj_weight', None)
     self.register_parameter('k_proj_weight', None)
     self.register_parameter('v_proj_weight', None)
 
-    self.in_proj_bias = nn.Parameter(torch.empty(3 * self.embed_dim)) ## 거의 아무 의미 없는 값들로 parameter을 채워주기 때문에
+    #self.in_proj_bias = nn.Parameter(torch.empty(3 * self.embed_dim)) ## 거의 아무 의미 없는 값들로 parameter을 채워주기 때문에
+    self.in_proj = nn.Linear(self.embed_dim, self.embed_dim*3, bias=True)
     self.out_proj = nn.Linear(self.embed_dim, self.embed_dim, bias=True)
 
     self.bias_k = nn.Parameter(torch.empty(1, 1, self.embed_dim))
@@ -62,7 +63,8 @@ class MultiHeadAttention(nn.Module):
     """
     target_seq_length, batch_size, embed_dim = query.shape
     scaling = float(self.head_dim) ** -0.5
-    out = F.linear(query, self.in_proj_weight, self.in_proj_bias)
+    out = self.in_proj(query)
+    # out = F.linear(query, self.in_proj_weight, self.in_proj_bias)
     q, k, v = torch.tensor_split(out,3,dim = -1)
     q *= scaling
     k = torch.cat([k, self.bias_k.repeat(1, batch_size, 1)])
