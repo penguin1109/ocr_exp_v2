@@ -93,7 +93,7 @@ class HangulLabelConverter(object):
             score_ = score.argmax(dim=1)
             text = ''
             for idx, s in enumerate(score_):
-                temp = self.char_decoder_dict[s]
+                temp = self.char_decoder_dict[s.item()]
                 if temp == self.null_char:
                   break ## <null> char이 나오면 이제 끝났다는 뜻
                 if temp == self.unknown_char:
