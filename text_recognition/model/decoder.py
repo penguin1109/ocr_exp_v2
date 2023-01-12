@@ -95,7 +95,7 @@ class AttentionalDecoder(nn.Module):
     ## (3) Calculate the Attention Matrix 
     attn_scores = torch.bmm(q, key.flatten(2, 3))  # (N, T, (H*W))
     attn_scores = attn_scores / (E ** 0.5)
-    attn_scores = torch.softmax(attn_scores, dim=-1)
+    attn_scores = F.softmax(attn_scores, dim=-1)
 
     v = v.permute(0, 2, 3, 1).view(N, -1, E)  # (N, (H*W), E)
     attn_vecs = torch.bmm(attn_scores, v)  # (N, T, E)

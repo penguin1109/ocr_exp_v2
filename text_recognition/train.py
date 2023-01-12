@@ -52,7 +52,7 @@ class Trainer(object):
     super(Trainer, self).__init__()
     self.config = config
   
-    train_dataset = HENNetDataset(config.BASE_DIR, aug=True, mode='train')
+    train_dataset = HENNetDataset(config.BASE_DIR, aug=False, mode='train')
     valid_dataset = HENNetDataset(config.BASE_DIR, aug=False, mode='valid')
     self.train_dataloader = DataLoader(train_dataset, batch_size = config.batch_size, shuffle = True)
     self.valid_dataloader = DataLoader(valid_dataset, batch_size=1, shuffle=False)

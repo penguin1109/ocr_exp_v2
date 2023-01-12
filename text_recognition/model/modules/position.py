@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 class PositionEncoding(nn.Module):
   def __init__(self, 
-              max_length=75+1, ## Additional Stop Token 추가
+              max_length=75, # +1, ## Additional Stop Token 추가
               embedding_dim=512,
               dropout_rate=0.1,
               device=torch.device('cuda')):
@@ -20,15 +20,17 @@ class PositionEncoding(nn.Module):
     embedding_dim: Dimension of the model
     """
     self.dropout = nn.Dropout(dropout_rate)
-    self.encoding = torch.zeros(max_length, embedding_dim, device = device)
-    self.encoding.requires_grad = False
+    encoding = torch.zeros(max_length, embedding_dim, device = device)
+    encoding.requires_grad = False
     pos = torch.arange(0, max_length, device = device)
     pos = pos.float().unsqueeze(dim = 1)
-    _2i = torch.arange(0, embedding_dim, step = 2, device = device).float()
+    div_term = torch.exp(torch.arange(0, embedding_dim, 2).float() * (-math.log(10000.0) / embedding_dim)).to(device)
+    # _2i = torch.arange(0, embedding_dim, step = 2, device = device).float()
 
-    self.encoding[:, ::2] = torch.sin(pos / (1000 ** (_2i / embedding_dim)))
-    self.encoding[:, 1::2] = torch.cos(pos / (1000 ** (_2i / embedding_dim)))
-    self.encoding = self.encoding.unsqueeze(0).transpose(0, 1)
+    encoding[:, ::2] = torch.sin(pos * div_term) # torch.sin(pos / (1000 ** (_2i / embedding_dim)))
+    encoding[:, 1::2] = torch.cos(pos*div_term) # torch.cos(pos / (1000 ** (_2i / embedding_dim)))
+    encoding = encoding.unsqueeze(0).transpose(0, 1)
+    self.register_buffer('pe', encoding)
     
   
   def forward(self, x):
@@ -38,7 +40,7 @@ class PositionEncoding(nn.Module):
     out: (sequence_length, batch_size, embedding_dimension)
     """
     seq_len, batch_size, embed_dim = x.shape
-    x = x + self.encoding[:seq_len, :]
+    x = x + self.pe[:seq_len, :]
 
     return self.dropout(x)
   
