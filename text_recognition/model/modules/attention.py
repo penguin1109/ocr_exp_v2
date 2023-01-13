@@ -53,6 +53,7 @@ class MultiHeadAttention(nn.Module):
     attention_weight = torch.matmul(q, k.transpose(-2, -1))
     attention_weight = F.softmax(attention_weight, dim = -1)
 
+    ## 아래의 attention output에 대한 reshape연산으로 multi-head output을 concatenate하는 것과 동일한 효과가 나게 된다.
     attention_output = torch.matmul(attention_weight, v).permute(0, 2, 1, 3).reshape(batch_size, target_seq_length, self.embed_dim)
     # print(attention_output.shape)
     attention_output = self.out_proj(attention_output)
