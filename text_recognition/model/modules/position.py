@@ -7,13 +7,15 @@ import torch.nn.functional as F
 - In the paper, the max_length is set to the 75. (Not written on the paper, but is told by the author of the paper)
 - In the paper, the embedding dimension is not written.
 """
+USE_CUDA=torch.cuda.is_available()
+DEVICE=torch.device('cuda:6' if USE_CUDA else 'cpu')
 
 class PositionEncoding(nn.Module):
   def __init__(self, 
               max_length=75, # +1, ## Additional Stop Token 추가
               embedding_dim=512,
               dropout_rate=0.1,
-              device=torch.device('cuda')):
+              device=DEVICE):
     super(PositionEncoding, self).__init__()
     """sin, cos encoding 구현
     max_length: 전체 단어 / 문장의 최대 길이 (단, Hangul Net에서는 3 X 단어의 수이다.)
@@ -24,7 +26,7 @@ class PositionEncoding(nn.Module):
     encoding.requires_grad = False
     pos = torch.arange(0, max_length, device = device)
     pos = pos.float().unsqueeze(dim = 1)
-    div_term = torch.exp(torch.arange(0, embedding_dim, 2).float() * (-math.log(10000.0) / embedding_dim)).to(device)
+    div_term = torch.exp(torch.arange(0, embedding_dim, 2).float() * (-math.log(10000.0) / embedding_dim)).to(dveice)
     # _2i = torch.arange(0, embedding_dim, step = 2, device = device).float()
 
     encoding[:, ::2] = torch.sin(pos * div_term) # torch.sin(pos / (1000 ** (_2i / embedding_dim)))

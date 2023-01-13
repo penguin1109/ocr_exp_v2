@@ -5,6 +5,9 @@ from loguru import logger
 import datetime
 TODAY=datetime.datetime.now()
 TODAY=TODAY.strftime('%Y-%m-%d')
+USE_CUDA=torch.cuda.is_available()
+DEVICE=torch.device("cuda:6" is USE_CUDA else 'cpu')
+
 def Accuracy_metric(prediction, label):
   ## label이 one-hot으로 주어져 있음
   converter = HangulLabelConverter(add_num=True, add_eng=True)
@@ -79,9 +82,9 @@ class Trainer(object):
       for idx, batch in enumerate(loop):
         self.optimizer.zero_grad()
         image, label, text, length = batch
-        image = image.cuda()
+        image = image.to(DEVICE)
         prediction = self.model(image)
-        loss = self.criterion(prediction, label.cuda(), length)
+        loss = self.criterion(prediction, label.to(DEVICE), length)
         loss.backward()
         self.optimizer.step()
         loop.set_postfix({"Loss": loss.item()})
@@ -95,9 +98,9 @@ class Trainer(object):
           running_acc = 0.0
           for idx, batch in enumerate(loop):
             image, label, text, length = batch
-            image = image.cuda()
+            image = image.to(DEVICE)
             prediction = self.model(image)
-            acc = Accuracy_metric(prediction, label.cuda())
+            acc = Accuracy_metric(prediction, label.to(DEVICE))
             loop.set_postfix({"ACC": acc})
             running_acc += acc
         logger.info(f"Accuracy is : {running_acc / len(loop)}")
