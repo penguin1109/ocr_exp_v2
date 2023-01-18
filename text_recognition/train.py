@@ -6,7 +6,7 @@ import datetime
 TODAY=datetime.datetime.now()
 TODAY=TODAY.strftime('%Y-%m-%d')
 USE_CUDA=torch.cuda.is_available()
-DEVICE=torch.device("cuda:6" is USE_CUDA else 'cpu')
+DEVICE=torch.device("cuda:6" if USE_CUDA else 'cpu')
 
 def Accuracy_metric(prediction, label):
   ## label이 one-hot으로 주어져 있음
