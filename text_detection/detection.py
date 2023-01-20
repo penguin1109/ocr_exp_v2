@@ -11,6 +11,8 @@ import numpy as np
 STD = [0.20037157, 0.18366718, 0.19631825]
 MEAN = [0.90890862, 0.91631571, 0.90724233]
 BASE = '/content/drive/MyDrive/SpeakingFridgey/model_weights/detection'
+from src.ctpn import CTPN
+from ctpn_detect import TextDetector
 import cv2
 import numpy as np
 
@@ -77,7 +79,8 @@ def crop(morpho_image: np.ndarray, source_image: np.ndarray):
   return croped, croped_points
 
 def load_weight(weight_name, model):
-  pretrained = torch.load(os.path.join(BASE, weight_name))
+  # pretrained = torch.load(os.path.join(BASE, weight_name))
+  pretrained = torch.load(weight_name)
   model_weight = model.state_dict()
   if 'model_state_dict' in pretrained:
     pretrained = pretrained['model_state_dict']
@@ -135,11 +138,11 @@ def preprocess(image):
   return croped, points
 
 class DetectBot(object):
-  def __init__(self, remove_white=False):
+  def __init__(self, model_path,cfg, remove_white=False):
     self.crop = remove_white
-    self.cfg = CFG()
+    self.cfg = cfg
     model = CTPN().cuda()
-    model = load_weight("CTPN_FINAL_CHECKPOINT.pth", model)
+    model = load_weight(model_path, model)
     self.model = model
     self.detector = TextDetector(self.cfg)
 
@@ -192,8 +195,7 @@ class DetectBot(object):
 
 
 
-def detect(image_path):
-  cfg = CFG()
+def detect(cfg, image_path, model_weight):
   image = cv2.imread(image_path)
   original_image = image
   # (new_w, new_h), rescale_factor = rescale_for_detect(image)
@@ -211,7 +213,7 @@ def detect(image_path):
   ])(image)
   image = image.unsqueeze(0)
   model = CTPN().cuda()
-  model = load_weight('CTPN_FINAL_CHECKPOINT.pth', model)
+  model = load_weight(model_weight, model)
 
   detector = TextDetector(cfg)
   model.eval()
@@ -228,3 +230,39 @@ def detect(image_path):
 
   drawn_image = draw_box(original_image, detected_boxes)
   return drawn_image
+
+if __name__ == "__main__":
+  import os
+  class CFG:
+    def __init__(self):
+      self.MIN_V_OVERLAP = 0.7
+      self.MIN_SIZE_SIM = 0.7
+      self.MAX_HORI_GAP=20
+      self.CONF_SCORE=0.9
+      self.IOU_THRESH=0.2
+      self.ANCHOR_SHIFT= 16
+      self.FEATURE_STRIDE=16
+      self.ANCHOR_HEIGHTS=[
+             11, 15, 22, 32, 45, 65, 93, 133, 190, 273
+        ]
+      self.MIN_SCORE=0.9
+      self.NMS_THRESH=0.3
+      self.REFINEMENT= False
+      self.LOSS_LAMDA_REG=2.0
+      self.LOSS_LAMDA_CLS=1.0
+      self.LOSS_LAMBDA_REFINE=2.0
+      self.ANCHOR_IGNORE_LABEL=-1
+      self.ANCHOR_POSITIVE_LABEL= 1
+      self.ANCHOR_NEGATIVE_LABEL=0
+      self.IOU_OVERLAP_THRESH_POS=0.5
+      self.IOU_OVERLAP_THRESH_NEG= 0.3
+  cfg = CFG()
+  BASE = os.path.dirname(os.path.abspath(__file__))
+  MODEL_PATH=os.path.join(BASE, 'demo', 'weight', 'CTPN_FINAL_CHECKPOINT.pth')
+  FILE_PATH=os.path.join(BASE, 'demo', 'sample', 'recipt3.jpg')
+  #detected = detect(cfg, FILE_PATH, MODEL_PATH)
+  bot = DetectBot(MODEL_PATH, remove_white=True)
+  detected,box = bot(FILE_PATH)
+  cv2.imwrite(FILE_PATH.split('.')[0] + '_result' + '.jpg', detected)
+ # os.chdir()
+ # drawn_image = detect()

@@ -85,10 +85,18 @@ def decode(predicted_bboxes, anchor_boxes):
 class TextDetector:
     def __init__(self, cfg):
         self.cfg = cfg
-        self.CONF_SCORE = cfg.CONF_SCORE ## 0.9
-        self.IOU_THRESH = cfg.IOU_THRESH ## 0.2
-        self.FEATURE_STRIDE = cfg.FEATURE_STRIDE ## 16
-        self.ANCHOR_SHIFT = cfg.ANCHOR_SHIFT ## 16
+        if isinstance(cfg, dict):
+            self.CONF_SCORE=cfg['CONF_SCORE']
+            self.IOU_THRESH=cfg['IOU_THRESH']
+            self.FEATURE_STRIDE=cfg['FEATURE_STRIDE']
+            self.ANCHOR_SHIFT=cfg['ANCHOR_SHIFT']
+            self.ANCHOR_HEIGHTS=cfg['ANCHOR_HEIGHTS']
+        else:
+            self.CONF_SCORE = cfg.CONF_SCORE ## 0.9
+            self.IOU_THRESH = cfg.IOU_THRESH ## 0.2
+            self.FEATURE_STRIDE = cfg.FEATURE_STRIDE ## 16
+            self.ANCHOR_SHIFT = cfg.ANCHOR_SHIFT ## 16
+            self.ANCHOR_HEIGHTS=cfg.ANCHOR_HEIGHTS
         self.text_proposal_connector = TextProposalConnector(self.cfg)
 
     def __call__(self, predictions, image_size):
@@ -102,7 +110,7 @@ class TextDetector:
         anchor_boxes = generate_all_anchor_boxes(
             feature_map_size = feature_map_size,
             feature_stride = self.FEATURE_STRIDE,
-            anchor_heights = self.cfg.ANCHOR_HEIGHTS,
+            anchor_heights = self.ANCHOR_HEIGHTS,
             anchor_shift = self.ANCHOR_SHIFT
         )
 

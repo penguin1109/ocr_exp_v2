@@ -1,0 +1,40 @@
+DETECTION_PREDICTION:
+    MIN_V_OVERLAP: 0.7
+    MIN_SIZE_SIM: 0.7
+    MAX_HORI_GAP: 20
+    CONF_SCORE: 0.9
+    IOU_THRESH: 0.2 ## NMS를 계산할때 다른, 기준 CONF_SCORE을 넘은 RoI에 대해서 계산을 하게 된다.
+    # 겹치는IOU score이 0.2이하인 경우에만 선택하도록 한다. (그래야 중첩이 아니라고 생각함)
+
+    ANCHOR_SHIFT: 16
+    FEATURE_STRIDE: 16
+    ANCHOR_HEIGHTS: ## anchor height는 고정시켜서 학습을 하였기 때문에
+        # 결국 regression loss를 학습 시킬 때에도 target값을 고정된 anchor의 크기를 사용해서 encoding을 했을 것이다.
+        #- 7
+        - 11
+        - 15
+        - 22
+        - 32
+        - 45
+        - 65
+        - 93
+        - 133
+        - 190
+        - 273
+    MIN_SCORE: 0.9
+    NMS_THRESH: 0.3 ## 이걸 키우게 되면 
+    REFINEMENT: False
+
+DETECTION_TRAINING:
+    LOSS_LAMDA_REG: 2.0
+    LOSS_LAMDA_CLS: 1.0
+    LOSS_LAMBDA_REFINE: 2.0
+    ANCHOR_IGNORE_LABEL: -1
+    ANCHOR_POSITIVE_LABEL: 1
+    ANCHOR_NEGATIVE_LABEL: 0 ## Classification layer의 학습 target label
+    IOU_OVERLAP_THRESH_POS: 0.5 ## 해당 anchor을 ground truth와 비교할때 pos로 설정하는 최소 IOU값
+    IOU_OVERLAP_THRESH_NEG: 0.3 ## 해당 anchor을 ground truth와 비교할때 neg으로 설정하는 최대 IOU값
+
+RECOGNITION_PREDICTION:
+
+RECOGNITION_TRAINING:

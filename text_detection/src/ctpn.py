@@ -47,7 +47,7 @@ class CTPN(torch.nn.Module):
     def __init__(self,
                  n_classes=2,
                  f_out_channels=512,
-                 n_anchors=19,
+                 n_anchors=10,
                  hidden_size=128,
                  pretrained_backbone=True):
         super(CTPN, self).__init__()

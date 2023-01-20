@@ -42,7 +42,7 @@ def generate_basic_anchors(anchor_heights, anchor_shift):
     widths = np.ones(len(heights), dtype = np.float32) * anchor_shift
     sizes = np.column_stack((heights, widths))
     basic_anchors = np.apply_along_axis(
-        func1d = scale_anchor, axis = 1, arr = sizes, basic_anchor = basic_anchor
+        func1d = scale_anchor, axis = 1, arr = sizes,basis_anchor= basic_anchor
     ) ## 위에서 정의한 scale_anchor 함수를 사용하여서 
     return basic_anchors
 
