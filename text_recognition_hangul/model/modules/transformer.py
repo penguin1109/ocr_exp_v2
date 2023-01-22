@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import os, sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from attention import MultiHeadAttention
 
 class TransformerEncoderLayer(nn.Module):

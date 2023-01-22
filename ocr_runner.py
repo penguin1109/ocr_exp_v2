@@ -8,7 +8,8 @@
 import os, sys, yaml, cv2
 BASE=os.path.dirname(os.path.abspath(__file__))
 TEXT_DETECTION=os.path.join(BASE, 'text_detection')
-TEXT_RECOGNITION=os.path.join(BASE, 'text_recognition')
+TEXT_RECOGNITION_HANGUL=os.path.join(BASE, 'text_recognition_hangul')
+TEXT_RECOGNITION_MULTI=os.path.join(BASE, 'text_recognition_multi')
 
 sys.path.append(TEXT_DETECTION);sys.path.append(TEXT_RECOGNITION);
 
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     DETECTION_CFG=config['DETECTION_PREDICTION']
     RECOGNITION_CFG=config['RECOGNITION_PREDICTION']
     
-    IMAGE_PATH=os.path.join(TEXT_DETECTION, 'demo', 'sample', 'recipt.jpg')
+    IMAGE_PATH=os.path.join(TEXT_DETECTION, 'demo', 'sample', 'recipt14.jpg')
     DETECTION_MODEL_PATH=os.path.join(TEXT_DETECTION, 'demo', 'weight', 'CTPN_FINAL_CHECKPOINT.pth')
     detected = run_ocr(
         DETECTION_CFG, IMAGE_PATH, DETECTION_MODEL_PATH, True, None, None)

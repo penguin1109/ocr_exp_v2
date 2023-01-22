@@ -2,4 +2,8 @@
 *.png
 *.jpg
 *.PNG
+data/*
+*.zip
+unzip.py
+download.py
 */__pycache__/*

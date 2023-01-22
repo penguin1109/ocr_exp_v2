@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import math
 """Postitional Encoding (L, C)
 - The positional encoding module outputs the input feature map tensor added pixel wise with the position encoded vector
 - In the paper, the max_length is set to the 75. (Not written on the paper, but is told by the author of the paper)
@@ -26,7 +26,7 @@ class PositionEncoding(nn.Module):
     encoding.requires_grad = False
     pos = torch.arange(0, max_length, device = device)
     pos = pos.float().unsqueeze(dim = 1)
-    div_term = torch.exp(torch.arange(0, embedding_dim, 2).float() * (-math.log(10000.0) / embedding_dim)).to(dveice)
+    div_term = torch.exp(torch.arange(0, embedding_dim, 2).float() * (-math.log(10000.0) / embedding_dim)).to(device)
     # _2i = torch.arange(0, embedding_dim, step = 2, device = device).float()
 
     encoding[:, ::2] = torch.sin(pos * div_term) # torch.sin(pos / (1000 ** (_2i / embedding_dim)))

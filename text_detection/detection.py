@@ -166,7 +166,7 @@ class DetectBot(object):
       reg, cls = self.model(image)
 
     detected_boxes, scores = self.detector((reg, cls), image_size = new_shape)
-    print(len(detected_boxes))
+    print(len(detected_boxes)) ## Morphology를 수행해서 text영역을 최대 3부분을 찾을 수 있도록 한다.
     ratio_w, ratio_h = rescale_factor
     size_ = np.array([[ratio_w, ratio_h, ratio_w, ratio_h]])
     detected_boxes *= size_
@@ -182,6 +182,8 @@ class DetectBot(object):
     if self.crop:
       croped, points = preprocess(image)
       print(len(points))
+     # if len(points) > 1:
+      #  croped = [image];points=[(0, org_w, 0, org_h)]
     
     else:
       croped = [image];points = [(0, org_w, 0, org_h)];

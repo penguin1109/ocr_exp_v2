@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from jamo import h2j, j2hcj
+import os, sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from jamo_utils.jamo_merge import join_jamos
 
 ALPHABET='abcdefghijklmnopqrstuvwxyz'
@@ -18,15 +21,20 @@ class HangulLabelConverter(object):
                 base_character=' ㄱㄲㄳㄴㄵㄶㄷㄸㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅃㅄㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ',
                 add_num=False,
                 add_eng=False,
+                add_special=False,
                 max_length=75,
-                null_char=u'\u2591',
+                null_char=u'\u2591', ## 이제 텍스트 문자가 끝났음을 의미
                 unknown_char=u'\u2567'):
-        additional_character = SPECIAL ## 일부 포함하고 싶은 특수 문자도 character에 추가해 준다.
+        if add_special:
+          additional_character = SPECIAL
+        else:
+          additional_character = '' ## 일부 포함하고 싶은 특수 문자도 character에 추가해 준다.
 
         if add_num:
             additional_character += ''.join(str(i) for i in range(10))
         if add_eng:
             additional_character += ''.join(list(map(chr, range(97, 123))))
+        self.char_with_no_tokens = base_character + additional_character
         additional_character += unknown_char ## 문자 dictionary에 포함되지 않는 경우에는 unknown_char 로 처리를 하도록 한다.
         self.characters = base_character + additional_character if additional_character != ''  \
             else base_character
@@ -41,6 +49,8 @@ class HangulLabelConverter(object):
         self.max_length = max_length
         self.null_char = null_char
         self.unknown_char = unknown_char
+
+      
 
         for i, char in enumerate(self.characters):
             self.char_encoder_dict[char] = i ## 데이터셋을 만들떄 ground truth label을 학습을 위해 numeric label로 변환
@@ -87,17 +97,21 @@ class HangulLabelConverter(object):
     
     def decode(self, predicted):
         ## (1) Softmax 계산을 통해 0-1사이의, 합이 1인 logit으로 변경
-        scores = F.softmax(predicted, dim=2)
+        # scores = F.softmax(predicted, dim=2)
+        scores=predicted ## output이 LogSoftmax를 붙여서 나옴
         pred_text, pred_scores, pred_lengths = [], [], []
+        if len(scores.shape) == 2:
+            scores=scores.unsqueeze(0)
+            
         for score in scores:
             score_ = score.argmax(dim=1)
             text = ''
             for idx, s in enumerate(score_):
                 temp = self.char_decoder_dict[s.item()]
                 if temp == self.null_char:
-                  break ## <null> char이 나오면 이제 끝났다는 뜻
+                  break
                 if temp == self.unknown_char:
-                    text += '' ## 예측 불가능한건 공백
+                    text += ''
                 else:
                     text += temp
             ## (2) 자음과 모음이 분리되어 있는 문자열을 하나의 글자로 merge

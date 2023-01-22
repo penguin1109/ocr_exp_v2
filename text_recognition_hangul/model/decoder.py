@@ -29,10 +29,9 @@ def decoder_layer(in_c, out_c, k=3, s=1, p=1, mode='nearest', scale_factor=None,
 
 class Mini_UNet(nn.Module):
   def __init__(self, 
+                h, w,
                in_channels=512,
                num_channels=64,
-               h=8,
-               w=32,
                mode='nearest'):
     super(Mini_UNet, self).__init__()
     self.k_encoder = nn.Sequential(
@@ -64,13 +63,14 @@ class Mini_UNet(nn.Module):
 
 class AttentionalDecoder(nn.Module):
   def __init__(self,
+              img_h, img_w,
                in_channel=512,
                unet_channel=64,
                max_seq_length=75,
                embedding_dim=512):
     super(AttentionalDecoder, self).__init__()
     self.max_length = max_seq_length
-    self.unet = Mini_UNet(in_channels = in_channel, num_channels=unet_channel) # Feature Extraction (key)
+    self.unet = Mini_UNet(h=img_h//4, w=img_w//4, in_channels = in_channel, num_channels=unet_channel) # Feature Extraction (key)
     self.project = nn.Linear(in_channel, in_channel)
     self.pos_encoder = PositionEncoding(max_length = max_seq_length, embedding_dim = embedding_dim, dropout_rate = 0.1, device = 'cpu')
 
@@ -90,7 +90,7 @@ class AttentionalDecoder(nn.Module):
     zeros = x.new_zeros((self.max_length, N, E))  # (T, N, E)
     q = self.pos_encoder(zeros)  # (T, N, E)
     q = q.permute(1, 0, 2)  # (N, T, E)
-    q = self.project(q)  # (N, T, E)
+    # q = self.project(q)  # (N, T, E)
 
     ## (3) Calculate the Attention Matrix 
     attn_scores = torch.bmm(q, key.flatten(2, 3))  # (N, T, (H*W))

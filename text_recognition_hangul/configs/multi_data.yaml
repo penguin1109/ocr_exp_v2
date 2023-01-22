@@ -1,0 +1,79 @@
+MODEL_CFG:
+  PRETRAINED: ''
+  MAX_SEQ_LENGTH: 30 #75
+  EMBEDDING_DIM: 512
+  IMG_W: 64 # 32
+  IMG_H: 256 # 128
+
+TRAIN_CFG:
+  OPTIMIZER: 'Adadelta' #'Adam'
+  LR: !!float 1e-3
+  BATCH_SIZE: 300
+  EPOCH: !!int 100
+  EVAL_EPOCH: !!int 10
+  WEIGHT_FOLDER: '/home/guest/ocr_exp_v2/weight'
+
+
+DATA_CFG:
+  DATASET: 'HENDataset'
+  USE_OUTDOOR: !!bool false
+  BASE_FOLDER: '/home/guest/ocr_exp_v2/data' ## 학습을 text_recognition 폴더 내에서 시킬 것이기 때문에 
+  BASE_CHARACTERS: 
+    - ' ' ## 공백은 종성에 무조건 있기 때문에 꼭 포함을 시켜야 한다.
+    - 'ㄱ'
+    - 'ㄲ'
+    - 'ㄳ'
+    - 'ㄴ'
+    - 'ㄵ'
+    - 'ㄶ'
+    - 'ㄷ'
+    - 'ㄸ'
+    - 'ㄹ'
+    - 'ㄺ'
+    - 'ㄻ'
+    - 'ㄼ'
+    - 'ㄽ'
+    - 'ㄾ'
+    - 'ㄿ'
+    - 'ㅀ'
+    - 'ㅁ'
+    - 'ㅂ'
+    - 'ㅃ'
+    - 'ㅄ'
+    - 'ㅅ'
+    - 'ㅆ'
+    - 'ㅇ'
+    - 'ㅈ'
+    - 'ㅉ'
+    - 'ㅊ'
+    - 'ㅋ'
+    - 'ㅌ'
+    - 'ㅍ'
+    - 'ㅎ'
+    - 'ㅏ'
+    - 'ㅐ'
+    - 'ㅑ'
+    - 'ㅒ'
+    - 'ㅓ'
+    - 'ㅔ'
+    - 'ㅕ'
+    - 'ㅖ'
+    - 'ㅗ'
+    - 'ㅘ'
+    - 'ㅙ'
+    - 'ㅚ'
+    - 'ㅛ'
+    - 'ㅜ'
+    - 'ㅝ'
+    - 'ㅞ'
+    - 'ㅟ'
+    - 'ㅠ'
+    - 'ㅡ'
+    - 'ㅢ'
+    - 'ㅣ'
+  ADD_NUM: !!bool False
+  ADD_ENG: !!bool False
+  ADD_SPECIAL: !!bool False
+  MAX_LENGTH: !!int 30 # 75
+  IMG_H: !!int 64
+  IMG_W: !!int 256

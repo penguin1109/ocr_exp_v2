@@ -9,6 +9,8 @@ def to_contiguous(tensor):
     return tensor.contiguous()
 
 class FocalLoss(nn.Module):
+  ## grapheme의 클래스 불균형 문제를 해소하기 위해서 사용하는 loss function이다.
+  ## 더 예측 prob score이 항상 높은, 즉 발현 빈도수가 높은 class에 대한 중요도를 낮춰주도록 한다.
   def __init__(self, max_length=75, alpha=0.99, gamma=1, use_focal=False,
                size_average=True, sequence_normalize=False, sample_normalize=True):
     super(FocalLoss, self).__init__()

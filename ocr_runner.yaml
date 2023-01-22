@@ -1,8 +1,8 @@
 DETECTION_PREDICTION:
     MIN_V_OVERLAP: 0.7
     MIN_SIZE_SIM: 0.7
-    MAX_HORI_GAP: 20
-    CONF_SCORE: 0.9
+    MAX_HORI_GAP: 20 ## Max Horizontal Gap을 작게 두어야 최대한 단가 / 수량과 같은 정보가 따로 detect된다.
+    CONF_SCORE: 0.9 ## Confidence score 예측하는 부분에서 -> PV-RCNN에서 사용한 gt와의 IoU를 기반으로 학습하는 방법을 사용하면 어떨까? (performance based training)
     IOU_THRESH: 0.2 ## NMS를 계산할때 다른, 기준 CONF_SCORE을 넘은 RoI에 대해서 계산을 하게 된다.
     # 겹치는IOU score이 0.2이하인 경우에만 선택하도록 한다. (그래야 중첩이 아니라고 생각함)
 
