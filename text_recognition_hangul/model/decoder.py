@@ -66,35 +66,38 @@ class AttentionalDecoder(nn.Module):
               img_h, img_w,
                in_channel=512,
                unet_channel=64,
-               max_seq_length=75,
+               max_seq_length=75, ## 논문에서의 수식으로 따지면 Length of Total Sequence를 의미한다.
                embedding_dim=512):
     super(AttentionalDecoder, self).__init__()
     self.max_length = max_seq_length
     self.unet = Mini_UNet(h=img_h//4, w=img_w//4, in_channels = in_channel, num_channels=unet_channel) # Feature Extraction (key)
     self.project = nn.Linear(in_channel, in_channel)
+    ## position encoding vector은 그 자체로 query로 사용되고, 이는 [MAX LENGTH, EMBEDDING DIM]
     self.pos_encoder = PositionEncoding(max_length = max_seq_length, embedding_dim = embedding_dim, dropout_rate = 0.1, device = 'cpu')
-
+    
   def forward(self, x):
     """ Args
     x: input feature map that is reshaped (Batch Size=N, Embedding Dim = E, Height = H, Width = W)
     Outputs
     attn_vecs: (max_length, encoding_dim) the vector that has the attention
+    1. Query와 Key^T를 dot production하면 [MAX LENGTH, SEQUENCE 길이 = (H/4  x W/4)]가 된다.
+    2. 이후 normalize를 하고 softmax를 취해준 값에 Value를 dot product하면 [MAX LENGTH, EMBEDDING DIM]이 된다.
     """
-    N, E, H, W = x.shape 
+    N, E, H, W = x.shape  ## [batch, embedding dim, height, width]
     ## (0) Value vector: Original output of the Transformer Encoder
     v = x
     ## (1) Get the Key vector that is the output of the UNet Model
-    key = self.unet(x)
+    key = self.unet(x) ## KEY [H/4, W/4, Embedding Dim]
 
     ## (2) Calculate the Query Vector (=Position Encoding of the first-middle-last graphemes)
-    zeros = x.new_zeros((self.max_length, N, E))  # (T, N, E)
+    zeros = x.new_zeros((self.max_length, N, E))  # [max length, batch, embedding dim]
     q = self.pos_encoder(zeros)  # (T, N, E)
-    q = q.permute(1, 0, 2)  # (N, T, E)
-    # q = self.project(q)  # (N, T, E)
+    q = q.permute(1, 0, 2)  # (N, T, E) = [batch, max length, embeedding dim]
+    q = self.project(q)  # (N, T, E) 
 
     ## (3) Calculate the Attention Matrix 
     attn_scores = torch.bmm(q, key.flatten(2, 3))  # (N, T, (H*W))
-    attn_scores = attn_scores / (E ** 0.5)
+    attn_scores = attn_scores / (E ** 0.5) ## attention score normalize하기
     attn_scores = F.softmax(attn_scores, dim=-1)
 
     v = v.permute(0, 2, 3, 1).view(N, -1, E)  # (N, (H*W), E)

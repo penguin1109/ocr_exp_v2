@@ -56,16 +56,16 @@ class ResNet(nn.Module):
         super(ResNet, self).__init__()
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1,
                                bias=False)
-        self.bn1 = nn.BatchNorm2d(16)
+        self.bn1 = nn.BatchNorm2d(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
 
-        self.layer1 = self._make_layer(block, 16, layers[0], stride=2)
+        self.layer1 = self._make_layer(block, 32, layers[0], stride=2)
        # print("MADE first")
-        self.layer2 = self._make_layer(block, 32, layers[1], stride=1)
+        self.layer2 = self._make_layer(block, 64, layers[1], stride=1)
         #print("MADE second")
-        self.layer3 = self._make_layer(block,  64, layers[2], stride=2)
-        self.layer4 = self._make_layer(block,  128, layers[3], stride=1)
-        self.layer5 = self._make_layer(block, 256, layers[4], stride=1)
+        self.layer3 = self._make_layer(block,  128, layers[2], stride=2)
+        self.layer4 = self._make_layer(block,  256, layers[3], stride=1)
+        self.layer5 = self._make_layer(block, 512, layers[4], stride=1)
         
         for m in self.modules():
             if isinstance(m, nn.Conv2d):

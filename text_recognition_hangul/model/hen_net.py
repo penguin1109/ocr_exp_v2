@@ -22,7 +22,7 @@ class HENNet(nn.Module):
     super(HENNet, self).__init__()
     #self.resnet = resnet45()
     self.transformer_encoder = ResTransformer(
-      img_w=img_w, img_h=img_h, res_in=res_in,
+      img_w=img_w, img_h=img_h, res_in=res_in, device=torch.device('cuda:6'),
       model_dim=embedding_dim) # 이 안에 ResNet45가 있음
     self.attention_decoder = AttentionalDecoder( 
               img_h=img_h, img_w=img_w,
@@ -44,8 +44,8 @@ class HENNet(nn.Module):
     return pred
 
 if __name__ == "__main__":
-  net = HENNet(img_w=256, img_h=64, res_in=16, max_seq_length=30, embedding_dim=256, class_n=54).to(DEVICE)
-  sample = torch.rand((1, 3, 64, 256)).to(DEVICE)
+  net = HENNet(img_w=128, img_h=32, res_in=32, max_seq_length=30, embedding_dim=512, class_n=54).to(DEVICE)
+  sample = torch.rand((1, 3, 32,128)).to(DEVICE)
 
   out = net(sample)
   print(out.shape) ## (Batch Size, Max Sequence Length, Class Number)
