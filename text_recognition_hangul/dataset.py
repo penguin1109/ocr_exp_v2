@@ -68,6 +68,7 @@ def load_outdoor_data(label_folder_dir, image_file_dict: dict):
 class BaseDataset(Dataset):
   def __init__(self, mode, DATA_CFG: dict):
     super().__init__()
+    self.data_cfg = DATA_CFG
     self.mode = mode
     self.base_folder = DATA_CFG['BASE_FOLDER'] ## 모든 데이터들이 저장이 되어 있는 폴더 
     self.base_characters = DATA_CFG['BASE_CHARACTERS'] ## list
@@ -82,6 +83,40 @@ class BaseDataset(Dataset):
         base_character=''.join(self.base_characters), add_num=self.add_num, add_eng=self.add_eng,
         add_special=self.add_special, max_length=self.max_length
     )
+
+class HENDatasetOutdoor(BaseDataset):
+  def __init__(self, mode, DATA_CFG):
+    super().__init__(mode, DATA_CFG)
+    base_dir='/home/guest/ocr_exp_v2/data/croped_outdoor'
+    image_files = os.listdir(base_dir)
+    self.image_files = list(map(lambda x: os.path.join(base_dir, x), image_files))
+    label_dir='/home/guest/ocr_exp_v2/data/croped_outdoor.json'
+    with open(label_dir, 'r') as f:
+      self.label_data = json.load(f)['annotations']
+
+  def __len__(self):
+    if self.mode == 'train':
+      return int(len(self.image_files) * 0.5)
+    else:
+      return 100
+    
+  def __getitem__(self, idx):
+    select = random.choice(self.image_files)
+    for label in self.label_data:
+      if label['image'] == select.split('/')[-1]:
+        break
+    text = label['text']
+
+    image = cv2.imread(select)
+    image = cv2.resize(image, (self.img_w, self.img_h))
+    tensor_image = transforms.Compose([
+      transforms.ToTensor(),
+      transforms.Normalize(mean=self.data_cfg['MEAN'], std=self.data_cfg['STD'])
+    ])(image)
+
+    label = self.label_converter.encode(text, padding=True, one_hot=True)
+
+    return tensor_image, label, text
 
 class HENDatasetV2(BaseDataset):
   ## 오직 인쇄체 데이터셋만을 사용하기 위한 데이터셋
@@ -188,18 +223,21 @@ class HENDataset(BaseDataset):
   def _make_image_dict(self):
     image_file_dict = {}
     FOLDERS=os.listdir(self.base_folder)
-
+    #print(FOLDERS)
     for folder in FOLDERS:
-      if 'target' in folder or 'ipynb' in folder or 'outdoor' in folder:
-        continue
+      if folder not in [
+        'word', 'syllable'
+      ]:continue
       if 'outdoor' in folder:
         dir = os.path.join(self.base_folder, folder)
         image_file_dict[dir] = list(map(lambda x: os.path.join(dir, x), sorted(os.listdir(dir))))
-      elif 'printed' in folder:
+      elif folder in ['word', 'syllable']:
         dir = os.path.join(self.base_folder, folder)
+        if (os.path.isdir(dir) ==False):
+          continue
         DTYPES = os.listdir(dir)
         for dtype in DTYPES:
-          new_dir = os.path.join(dir, dtype, dtype)
+          new_dir = os.path.join(dir, dtype)
           if os.path.isdir(new_dir) == False or 'ipynb' in new_dir:
             continue
           image_file_dict[dtype] = list(map(lambda x: os.path.join(new_dir, x), sorted(os.listdir(new_dir))))
@@ -209,17 +247,21 @@ if __name__ == "__main__":
   import yaml
   import numpy as np
   from torch.utils.data import DataLoader
-  with open('/home/guest/ocr_exp_v2/text_recognition_hangul/configs/printed_data.yaml', 'r') as f:
+  with open('/home/guest/ocr_exp_v2/text_recognition_hangul/configs/outdoor_data.yaml', 'r') as f:
     cfg = yaml.load(f, Loader=yaml.FullLoader)
-  dataset = HENDatasetV2(mode='train', DATA_CFG=cfg['DATA_CFG'])
+  dataset = HENDatasetOutdoor(mode='train', DATA_CFG=cfg['DATA_CFG'])
   print(len(dataset))
-  print(dataset.label_converter.char_with_no_tokens)
-  loader = DataLoader(dataset, batch_size=3)
+  # print(dataset.label_converter.char_with_no_tokens)
+  loader = DataLoader(dataset, batch_size=300)
   for idx, batch in enumerate(loader):
     image, label, text = batch
     print(' '.join(text))
     for b in range(image.shape[0]):
       #print(image[b].shape)
       #print(np.unique(np.array(image[b].detach().cpu().numpy())))
+      
       cv2.imwrite(f"{b}.png", image[b].detach().permute(1,2 ,0).cpu().numpy()*255)
+    for c in range(3):
+      print(image[:,c,:,:].mean())
+      print(image[:, c,:,:].std())
     break

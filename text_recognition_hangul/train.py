@@ -73,7 +73,7 @@ import datetime
 TODAY=datetime.datetime.now()
 TODAY=TODAY.strftime('%Y-%m-%d')
 CONFIG_DIR='/home/guest/ocr_exp_v2/text_recognition_hangul/configs'
-from dataset import HENDataset, HENDatasetV2
+from dataset import HENDataset, HENDatasetV2, HENDatasetOutdoor
 from model.hen_net import HENNet
 
 if __name__ == "__main__":
@@ -88,7 +88,10 @@ if __name__ == "__main__":
   train_cfg = cfg['TRAIN_CFG']
   model_cfg = cfg['MODEL_CFG']
 
-  if 'V2' in data_cfg['DATASET']:
+  if 'Outdoor' in data_cfg['DATASET']:
+    train_dataset = HENDatasetOutdoor(mode='train', DATA_CFG=data_cfg)
+    test_dataset = HENDatasetOutdoor(mode='test', DATA_CFG=data_cfg)
+  elif 'V2' in data_cfg['DATASET']:
     train_dataset = HENDatasetV2(mode='train', DATA_CFG=data_cfg)
     test_dataset = HENDatasetV2(mode='test', DATA_CFG=data_cfg)
   else:
@@ -110,8 +113,8 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(model_cfg['PRETRAINED']))
   
   model.to(DEVICE)
-  #optimizer = torch.optim.Adam(model.parameters(), lr = train_cfg['LR'])
-  optimizer = torch.optim.Adagrad(model.parameters(), lr=1.0) ## Adagrad는 알아서 adaptive learning rate를 찾아가기 때문에 처음 learning rate는 1이어야 한다.
+  optimizer = torch.optim.Adam(model.parameters(), lr = train_cfg['LR'])
+  #optimizer = torch.optim.Adagrad(model.parameters(), lr=1.0) ## Adagrad는 알아서 adaptive learning rate를 찾아가기 때문에 처음 learning rate는 1이어야 한다.
   min_loss=100
   max_acc = 0.0
   logger.info("==== START TRAINING ====")
