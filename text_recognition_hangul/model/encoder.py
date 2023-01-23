@@ -17,14 +17,16 @@ from modules.resnet import resnet45
 """
 class ResTransformer(nn.Module):
     def __init__(self, 
+                img_w, img_h,res_in,device,
                  feedforward_dim=2048,
                  model_dim=512,
                  head_num=8,
                  dropout=0.1,
-                 num_layers=5):
+                 num_layers=5,):
         super(ResTransformer, self).__init__()
-        self.resnet = resnet45()
-
+        self.resnet = resnet45(res_in)
+        self.img_w = img_w
+        self.img_h = img_h
         self.d_model = model_dim
         self.nhead = head_num
         self.inner_dim = feedforward_dim
@@ -32,7 +34,7 @@ class ResTransformer(nn.Module):
         self.activation = nn.ReLU()
         self.num_layers = num_layers
 
-        self.pos_encoder = PositionEncoding(embedding_dim=self.d_model, max_length=8*32, dropout_rate = 0.1, device = 'cpu')
+        self.pos_encoder = PositionEncoding(embedding_dim=self.d_model, max_length=img_w * img_h, dropout_rate = 0.1, device =device)
         encoder_layer = TransformerEncoderLayer(model_dim=self.d_model, head_num=self.nhead, 
                 dim_feedforward=self.inner_dim, dropout=self.dropout, activation=self.activation)
         self.transformer = nn.ModuleList([

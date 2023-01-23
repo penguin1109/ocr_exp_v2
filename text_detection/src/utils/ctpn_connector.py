@@ -8,7 +8,16 @@ import numpy as np
 from typing import Tuple, List
 import os, sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from ctpn_detect import clip_boxes
+
+def clip_boxes(bboxes, image_size):
+    ## 원본 이미지의 크기의 가로, 세로보다 넘치거나 0보다 작은 길이를 가질수도 있어서 그부분 예외 처리
+    H, W = image_size
+    zero = 0.0
+    W_diff, H_diff = W - 1., H - 1.
+    bboxes[:, 0::2] = np.maximum(np.minimum(bboxes[:, 0::2], W_diff), zero)
+    bboxes[:, 1::2] = np.maximum(np.minimum(bboxes[:, 1::2], H_diff), zero)
+
+    return bboxes
 
 def fit_y(X, Y, x1, x2):
     """
@@ -50,9 +59,14 @@ class Graph:
 class TextProposalGraphBuilder(object):
     def __init__(self, cfg):
         self.cfg = cfg
-        self.MIN_V_OVERLAP=cfg.MIN_V_OVERLAP ## 0.7
-        self.MIN_SIZE_SIM=cfg.MIN_SIZE_SIM ## 0.7
-        self.MAX_HORI_GAP=cfg.MAX_HORI_GAP ## 50 
+        if isinstance(cfg, dict):
+            self.MIN_V_OVERLAP=cfg['MIN_V_OVERLAP']
+            self.MIN_SIZE_SIM=cfg['MIN_SIZE_SIM']
+            self.MAX_HORI_GAP=cfg['MAX_HORI_GAP']
+        else:
+            self.MIN_V_OVERLAP=cfg.MIN_V_OVERLAP ## 0.7
+            self.MIN_SIZE_SIM=cfg.MIN_SIZE_SIM ## 0.7
+            self.MAX_HORI_GAP=cfg.MAX_HORI_GAP ## 50 
     
     def get_precursors(self, index):
         """ 현재 text box과 동일한 group에 존재하는 이전 text proposal을 구한다.
@@ -147,7 +161,10 @@ class TextProposalConnector(object):
     def __init__(self, cfg):
         self.graph_builder = TextProposalGraphBuilder(cfg)
         self.cfg = cfg
-        self.refine = cfg.REFINEMENT
+        if isinstance(cfg, dict):
+            self.refine = cfg['REFINEMENT']
+        else:
+            self.refine = cfg.REFINEMENT
     
     def group_text_proposals(self, text_proposals, scores, image_size):
         graph = self.graph_builder.build_graph(text_proposals=text_proposals, scores=scores,image_size=image_size)

@@ -11,10 +11,76 @@ import numpy as np
 STD = [0.20037157, 0.18366718, 0.19631825]
 MEAN = [0.90890862, 0.91631571, 0.90724233]
 BASE = '/content/drive/MyDrive/SpeakingFridgey/model_weights/detection'
+from src.ctpn import CTPN
+from ctpn_detect import TextDetector
+import cv2
+import numpy as np
 
+
+def to_gray(image: np.ndarray):
+  return cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+def sobel_gradient(gray_image: np.ndarray):
+  blurred = cv2.GaussianBlur(gray_image, (9, 9), 0)
+  # sobel gradient
+  gradX = cv2.Sobel(blurred, ddepth = cv2.CV_32F, dx=1, dy=0)
+  gradY = cv2.Sobel(blurred, ddepth=cv2.CV_32F, dx=0, dy=1)
+
+  gradient = cv2.subtract(gradX, gradY)
+  gradient = cv2.convertScaleAbs(gradient)
+
+  # thresh and blur
+  blurred = cv2.GaussianBlur(gradient, (9, 9), 0)
+  return cv2.threshold(blurred, thresh=100, maxval=255, type=cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1], blurred
+
+def morphology(threshed_image: np.ndarray, erode_iterations: int, dilate_iterations: int):
+  H, W = threshed_image.shape
+  if H > W:
+    kernel_size = (int(W / 18), int(H/40))
+  else:
+    kernel_size = (int(W / 40), int(H / 18))
+  kernel = cv2.getStructuringElement(cv2.MORPH_RECT, kernel_size)
+  
+  morpho_image = cv2.morphologyEx(threshed_image, cv2.MORPH_CLOSE, kernel)
+  morpho_image = cv2.erode(morpho_image, None, iterations=erode_iterations)
+  morpho_image = cv2.dilate(morpho_image, None, iterations=dilate_iterations)
+
+  return morpho_image
+
+def crop(morpho_image: np.ndarray, source_image: np.ndarray):
+  contours, _ = cv2.findContours(morpho_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2:]
+  crops = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
+  croped = []
+  croped_points = []
+  H, W, C = source_image.shape
+  for c in crops:
+    rect = cv2.minAreaRect(c)
+    box = np.int0(cv2.boxPoints(rect))
+
+    H, W, C = source_image.shape
+    total = H * W
+    Xs = [i[0] for i in box]
+    Ys = [i[1] for i in box]
+
+    x1 = max(min(Xs), 0)
+    x2 = min(max(Xs), W)
+    y1 = max(min(Ys), 0)
+    y2 = min(max(Ys), H)
+
+    new_height, new_width = y2-y1, x2-x1
+    if new_height < H / 4 or new_width < W / 4: ## 잘린 이미지의 가로와 세로의 길이가 일정 비율보다 작다면 그냥 crop 하지 않고 사용한다.
+      break
+    else:
+      croped.append(source_image[y1:y1+new_height, x1:x1 + new_width])
+      croped_points.append((x1, x2, y1, y2))
+  if len(croped) == 0:
+    croped.append(source_image)
+    croped_points.append((0, W, 0, H))
+  return croped, croped_points
 
 def load_weight(weight_name, model):
-  pretrained = torch.load(os.path.join(BASE, weight_name))
+  # pretrained = torch.load(os.path.join(BASE, weight_name))
+  pretrained = torch.load(weight_name)
   model_weight = model.state_dict()
   if 'model_state_dict' in pretrained:
     pretrained = pretrained['model_state_dict']
@@ -72,11 +138,11 @@ def preprocess(image):
   return croped, points
 
 class DetectBot(object):
-  def __init__(self, remove_white=False):
+  def __init__(self, model_path,cfg, remove_white=False):
     self.crop = remove_white
-    self.cfg = CFG()
+    self.cfg = cfg
     model = CTPN().cuda()
-    model = load_weight("CTPN_FINAL_CHECKPOINT.pth", model)
+    model = load_weight(model_path, model)
     self.model = model
     self.detector = TextDetector(self.cfg)
 
@@ -100,7 +166,7 @@ class DetectBot(object):
       reg, cls = self.model(image)
 
     detected_boxes, scores = self.detector((reg, cls), image_size = new_shape)
-    print(len(detected_boxes))
+    print(len(detected_boxes)) ## Morphology를 수행해서 text영역을 최대 3부분을 찾을 수 있도록 한다.
     ratio_w, ratio_h = rescale_factor
     size_ = np.array([[ratio_w, ratio_h, ratio_w, ratio_h]])
     detected_boxes *= size_
@@ -116,6 +182,8 @@ class DetectBot(object):
     if self.crop:
       croped, points = preprocess(image)
       print(len(points))
+     # if len(points) > 1:
+      #  croped = [image];points=[(0, org_w, 0, org_h)]
     
     else:
       croped = [image];points = [(0, org_w, 0, org_h)];
@@ -129,8 +197,7 @@ class DetectBot(object):
 
 
 
-def detect(image_path):
-  cfg = CFG()
+def detect(cfg, image_path, model_weight):
   image = cv2.imread(image_path)
   original_image = image
   # (new_w, new_h), rescale_factor = rescale_for_detect(image)
@@ -148,7 +215,7 @@ def detect(image_path):
   ])(image)
   image = image.unsqueeze(0)
   model = CTPN().cuda()
-  model = load_weight('CTPN_FINAL_CHECKPOINT.pth', model)
+  model = load_weight(model_weight, model)
 
   detector = TextDetector(cfg)
   model.eval()
@@ -165,3 +232,39 @@ def detect(image_path):
 
   drawn_image = draw_box(original_image, detected_boxes)
   return drawn_image
+
+if __name__ == "__main__":
+  import os
+  class CFG:
+    def __init__(self):
+      self.MIN_V_OVERLAP = 0.7
+      self.MIN_SIZE_SIM = 0.7
+      self.MAX_HORI_GAP=20
+      self.CONF_SCORE=0.9
+      self.IOU_THRESH=0.2
+      self.ANCHOR_SHIFT= 16
+      self.FEATURE_STRIDE=16
+      self.ANCHOR_HEIGHTS=[
+             11, 15, 22, 32, 45, 65, 93, 133, 190, 273
+        ]
+      self.MIN_SCORE=0.9
+      self.NMS_THRESH=0.3
+      self.REFINEMENT= False
+      self.LOSS_LAMDA_REG=2.0
+      self.LOSS_LAMDA_CLS=1.0
+      self.LOSS_LAMBDA_REFINE=2.0
+      self.ANCHOR_IGNORE_LABEL=-1
+      self.ANCHOR_POSITIVE_LABEL= 1
+      self.ANCHOR_NEGATIVE_LABEL=0
+      self.IOU_OVERLAP_THRESH_POS=0.5
+      self.IOU_OVERLAP_THRESH_NEG= 0.3
+  cfg = CFG()
+  BASE = os.path.dirname(os.path.abspath(__file__))
+  MODEL_PATH=os.path.join(BASE, 'demo', 'weight', 'CTPN_FINAL_CHECKPOINT.pth')
+  FILE_PATH=os.path.join(BASE, 'demo', 'sample', 'recipt3.jpg')
+  #detected = detect(cfg, FILE_PATH, MODEL_PATH)
+  bot = DetectBot(MODEL_PATH, remove_white=True)
+  detected,box = bot(FILE_PATH)
+  cv2.imwrite(FILE_PATH.split('.')[0] + '_result' + '.jpg', detected)
+ # os.chdir()
+ # drawn_image = detect()
