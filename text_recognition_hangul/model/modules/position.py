@@ -4,6 +4,9 @@ import numpy as np
 import torch.nn.functional as F
 import math
 """Postitional Encoding (L, C)
+- Uses the <register_buffer>
+  : if you have parameters in the model, which should be saved and restored in the state_dict
+    but not trained by the optimizer, you should register them as "buffers"
 - The positional encoding module outputs the input feature map tensor added pixel wise with the position encoded vector
 - In the paper, the max_length is set to the 75. (Not written on the paper, but is told by the author of the paper)
 - In the paper, the embedding dimension is not written.
@@ -34,7 +37,8 @@ class PositionEncoding(nn.Module):
     max_length: 전체 단어 / 문장의 최대 길이 (단, Hangul Net에서는 3 X 단어의 수이다.)
     embedding_dim: Dimension of the model
     """
-    self.dropout = nn.Dropout(dropout_rate)
+    self.dropout = None
+    # self.dropout = nn.Dropout(dropout_rate)
     #encoding = torch.zeros(max_length, embedding_dim, device = device)
     #encoding.requires_grad = False
     pe = torch.zeros(max_length, embedding_dim, device=device)
@@ -81,13 +85,15 @@ class PositionEncoding(nn.Module):
     x = x + self.pe[:seq_len, :]
     #print(x.shape)
     # x = x + pos_embs[:seq_len, :] ## input embedding인 x와 position embedding을 더해주면 된다.
-
-    return self.dropout(x)
+    if self.dropout is not None:
+      x = self.dropout(x)
+    return x
 
 
 
 if __name__ == "__main__":
   import os
+  import numpy as np
   import matplotlib.pyplot as plt
   FIGURE_PATH='/home/guest/ocr_exp_v2/figures'
   PE = PositionEncoding(
@@ -95,12 +101,15 @@ if __name__ == "__main__":
   ).to(DEVICE)
 
   pos_encode_vec = PE.pe
-  print(pos_encode_vec.shape)
-  plt.pcolormesh(pos_encode_vec.detach().cpu().numpy()[:,0,:], cmap='RdBu')
-  
+  print(np.unique(pos_encode_vec.detach().cpu().numpy()))
+  # print(pos_encode_vec.shape)
+  sample = torch.zeros((75, 1, 512)).to(DEVICE)
+  out = PE(sample)
+  # plt.pcolormesh(pos_encode_vec.detach().cpu().numpy()[:,0,:], cmap='RdBu')
+  plt.pcolormesh(out.detach().cpu().numpy()[:,0,:], cmap = 'RdBu')
   plt.xlabel('Depth')
   plt.xlim((0, 512))
   plt.ylabel('Position')
   plt.colorbar()
-  plt.savefig(os.path.join(FIGURE_PATH, 'postion_encoding.png'))
+  plt.savefig(os.path.join(FIGURE_PATH, 'postion_encoding_output.png'))
 

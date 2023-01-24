@@ -14,7 +14,7 @@ DEVICE=torch.device("cuda:6") if torch.cuda.is_available() else torch.device("cp
 """
 class HENNet(nn.Module):
   def __init__(self, 
-              img_w, img_h, res_in, 
+              img_w, img_h, res_in, head_num,
                max_seq_length=75, ## 논문의 저자들이 지정한 가장 긴 길이의 sequence length인데, 75라는 것은 총 문자의 개수가 25개라는 것이다.
                embedding_dim=512, ## transformer encoder에서 model output의 dimension을 나타냄
                class_n=52, ## 한글에서의 초성-중성-종성의 개수를 나타냄
@@ -22,7 +22,8 @@ class HENNet(nn.Module):
     super(HENNet, self).__init__()
     #self.resnet = resnet45()
     self.transformer_encoder = ResTransformer(
-      img_w=img_w, img_h=img_h, res_in=res_in, device=torch.device('cuda:6'),
+      img_w=img_w, img_h=img_h, res_in=res_in, 
+      device=torch.device('cuda:6'),head_num=head_num,
       model_dim=embedding_dim) # 이 안에 ResNet45가 있음
     self.attention_decoder = AttentionalDecoder( 
               img_h=img_h, img_w=img_w,

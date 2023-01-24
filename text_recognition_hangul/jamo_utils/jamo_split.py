@@ -40,7 +40,7 @@ def split_syllable_char(c):
         zip([INITIAL, MEDIAL, FINAL], [init, med, final])
     )
 
-def split_syllables(s, ignore_err=True, pad=None):
+def split_syllables(s, ignore_err=True, pad=' '):
     def try_split(c):
         try:
             return split_syllable_char(c)
@@ -57,7 +57,7 @@ def split_syllables(s, ignore_err=True, pad=None):
         tuples = map(lambda x: tuple(pad if y is None else y for y in x), s)
     else:
         tuples = map(lambda x: filter(None, x), s)
-
+  
     ## 한글은 자음과 모음을 분리하고 영어와 숫자는 그대로 보내 준다.
     # 한편, 특수 문자의 경우에는 그냥 '[UNK]' 토큰으로 예측하도록 한다.
 

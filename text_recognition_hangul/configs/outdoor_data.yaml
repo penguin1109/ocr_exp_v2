@@ -1,25 +1,27 @@
 MODEL_CFG:
-  PRETRAINED: ''
+  PRETRAINED: '' # '/home/guest/ocr_exp_v2/weight/2023-01-23_min_loss.pth'
+  PRETRAINED_OPTIM: '' 
   RES_IN: 32
   MAX_SEQ_LENGTH: 30 #75
   EMBEDDING_DIM: 512
-  IMG_W: 32
-  IMG_H: 128
+  IMG_W: 192
+  IMG_H: 32 # 128
 
 TRAIN_CFG:
-  OPTIMIZER: 'Adam'
+  LOSS_FN: 'CE'
+  OPTIMIZER: 'ADAM'
   LR: !!float 1e-3
-  BATCH_SIZE: 300
+  BATCH_SIZE: 200
   EPOCH: !!int 100
   EVAL_EPOCH: !!int 10
   WEIGHT_FOLDER: '/home/guest/ocr_exp_v2/weight'
-
+  OPTIM_FOLDER: '/home/guest/ocr_exp_v2/text_recognition_hangul/optim'
 
 DATA_CFG:
   DATASET: 'HENDatasetOutdoor'
   USE_OUTDOOR: !!bool true
-  MEAN: [0.48,0.27,0.48]
-  STD: [0.27,0.5,0.28]
+  MEAN: [0.5,0.1,0.4]
+  STD: [0.3,0.5,0.3]
   BASE_FOLDER: '/home/guest/ocr_exp_v2/data/croped_outdoor' ## 학습을 text_recognition 폴더 내에서 시킬 것이기 때문에 
   BASE_CHARACTERS: 
     - ' ' ## 공백은 종성에 무조건 있기 때문에 꼭 포함을 시켜야 한다.
@@ -79,4 +81,4 @@ DATA_CFG:
   ADD_SPECIAL: !!bool False
   MAX_LENGTH: !!int 30 # 75
   IMG_H: !!int 32
-  IMG_W: !!int 128
+  IMG_W: !!int 192 #128

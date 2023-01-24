@@ -88,21 +88,38 @@ class HENDatasetOutdoor(BaseDataset):
   def __init__(self, mode, DATA_CFG):
     super().__init__(mode, DATA_CFG)
     base_dir='/home/guest/ocr_exp_v2/data/croped_outdoor'
+    self.base_dir=base_dir
     image_files = os.listdir(base_dir)
     self.image_files = list(map(lambda x: os.path.join(base_dir, x), image_files))
     label_dir='/home/guest/ocr_exp_v2/data/croped_outdoor.json'
     with open(label_dir, 'r') as f:
       self.label_data = json.load(f)['annotations']
+    self._filter_length()
 
   def __len__(self):
     if self.mode == 'train':
       return int(len(self.image_files) * 0.5)
+    elif self.mode == 'examine':
+      return len(self.image_files)
     else:
       return 100
-    
+  
+  def _filter_length(self):
+    for i in self.label_data:
+      text = i['text']
+      label = self.label_converter.encode(text, padding=False, one_hot=False)
+      if len(label)> self.max_length:
+        print(text)
+        print(i['image'])
+        self.label_data.remove(i)
+        self.image_files.remove(os.path.join(self.base_dir, i['image']))
+
   def __getitem__(self, idx):
-    select = random.choice(self.image_files)
-    for label in self.label_data:
+    if self.mode == 'debug' or self.mode == 'test':
+      select = idx
+    else:
+      select = random.choice(self.image_files)
+    for label in self.label_data: ## 이미지 데이터에 맞는 라벨 데이터를 찾아줄 수 있다.
       if label['image'] == select.split('/')[-1]:
         break
     text = label['text']
@@ -123,6 +140,7 @@ class HENDatasetV2(BaseDataset):
   def __init__(self, mode, DATA_CFG):
     super().__init__(mode, DATA_CFG)
     base_dir=DATA_CFG['BASE_FOLDER']
+    self.data_cfg = DATA_CFG
     data_files = os.listdir(os.path.join(base_dir, 'croped_sentence'))
     self.image_files = sorted([x for x in data_files if x.split('.')[-1] == 'png'])
     label_data = list(set(data_files) - set(self.image_files))[0]
@@ -150,15 +168,19 @@ class HENDatasetV2(BaseDataset):
 
   def __len__(self):
     if self.mode == 'train':
-      return int(0.2 * len(self.image_files))
+      return len(self.image_files) # int(0.5 * len(self.image_files))
+    elif self.mode == 'debug':
+      return 3000
     else:
       return 100
     
   def __getitem__(self, idx):
+
     image = cv2.imread(self.image_files[idx])
+    image = cv2.resize(image, (self.img_w, self.img_h))
     tensor_image = transforms.Compose([
       transforms.ToTensor(),
-      transforms.Resize((self.img_h, self.img_w))
+      transforms.Normalize(self.data_cfg['MEAN'], self.data_cfg['STD'])
     ])(image)
 
     text = self.label_data[idx]['text']
@@ -189,7 +211,7 @@ class HENDataset(BaseDataset):
     if self.mode == 'train':
       items = self.image_file_dict.values()
       n = sum(list(map(lambda x: len(x), items)))
-      return int(n * 0.1)
+      return n
     else:
       return 100 ## Testing이나 Evaluate할 때는 한번에 하나씩 사용하기 때문에 -> 즉, batch=1으로 inference를 하게 될 것이라는 뜻이다.
   
@@ -246,22 +268,47 @@ class HENDataset(BaseDataset):
 if __name__ == "__main__":
   import yaml
   import numpy as np
+  import torch
+  import torch.nn.functional as F
   from torch.utils.data import DataLoader
-  with open('/home/guest/ocr_exp_v2/text_recognition_hangul/configs/outdoor_data.yaml', 'r') as f:
+  with open('/home/guest/ocr_exp_v2/text_recognition_hangul/configs/printed_data.yaml', 'r') as f:
     cfg = yaml.load(f, Loader=yaml.FullLoader)
-  dataset = HENDatasetOutdoor(mode='train', DATA_CFG=cfg['DATA_CFG'])
+  dataset = HENDatasetV2(mode='debug', DATA_CFG=cfg['DATA_CFG'])
   print(len(dataset))
   # print(dataset.label_converter.char_with_no_tokens)
-  loader = DataLoader(dataset, batch_size=300)
-  for idx, batch in enumerate(loader):
+  loader = DataLoader(dataset, batch_size=30)
+  MEAN=[0.0,0.0,0.0];STD=[0,0,0];
+  NUMS = len(loader)
+  from tqdm import tqdm
+  loop = tqdm(loader)
+
+  for idx, batch in enumerate(loop):
     image, label, text = batch
-    print(' '.join(text))
+    print(image[0].max())
+    print(image[0].min())
+    # print(text)
+
+  """ MEAN & STD FINDING
+  for idx, batch in enumerate(loop):
+    image, label, text = batch
+    # print(' '.join(text))
     for b in range(image.shape[0]):
       #print(image[b].shape)
       #print(np.unique(np.array(image[b].detach().cpu().numpy())))
       
       cv2.imwrite(f"{b}.png", image[b].detach().permute(1,2 ,0).cpu().numpy()*255)
     for c in range(3):
-      print(image[:,c,:,:].mean())
-      print(image[:, c,:,:].std())
-    break
+      MEAN[c] += image[:,c,:,:].mean()
+      STD[c] += image[:, c, :, :].std()
+    if idx == 3:
+      break
+  from loguru import logger
+  for i in range(3):
+    MEAN[i] /= idx
+    STD[i] /= idx
+  logger.info(f"MEAN: {MEAN}")
+  logger.info(f"STD: {STD}")
+      # print(image[:,c,:,:].mean())
+      # print(image[:, c,:,:].std())
+    # break
+  """

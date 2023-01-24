@@ -15,16 +15,16 @@ from modules.position import PositionEncoding
 
 def encoder_layer(in_c, out_c, k=3, s=2, p=1):
     return nn.Sequential(nn.Conv2d(in_c, out_c, k, s, p),
-                         nn.BatchNorm2d(out_c),
-                         nn.ReLU(True))
+                         nn.BatchNorm2d(out_c),#  nn.LeakyReLU())
+                         nn.Tanh()) #nn.ReLU(True))
 
 def decoder_layer(in_c, out_c, k=3, s=1, p=1, mode='nearest', scale_factor=None, size=None):
     align_corners = None if mode=='nearest' else True
     return nn.Sequential(nn.Upsample(size=size, scale_factor=scale_factor, 
                                      mode=mode, align_corners=align_corners),
                          nn.Conv2d(in_c, out_c, k, s, p),
-                         nn.BatchNorm2d(out_c),
-                         nn.ReLU(True))
+                         nn.BatchNorm2d(out_c),# nn.LeakyReLU() )
+                         nn.Tanh()) # nn.ReLU(True))
 
 
 class Mini_UNet(nn.Module):
@@ -93,7 +93,8 @@ class AttentionalDecoder(nn.Module):
     zeros = x.new_zeros((self.max_length, N, E))  # [max length, batch, embedding dim]
     q = self.pos_encoder(zeros)  # (T, N, E)
     q = q.permute(1, 0, 2)  # (N, T, E) = [batch, max length, embeedding dim]
-    q = self.project(q)  # (N, T, E) 
+    q = self.project(q)  # (N, T, E) -> 이 projection이 없어도 된다고 생각했었으나, 
+                    # 작동 원리를 생각해 보면 입력 이미지마다 scale이 다를 수도 있기 때문에 위치를 미세 조정해서 적용하기 위해 있다고 볼수 있다.
 
     ## (3) Calculate the Attention Matrix 
     attn_scores = torch.bmm(q, key.flatten(2, 3))  # (N, T, (H*W))

@@ -31,10 +31,10 @@ class ResTransformer(nn.Module):
         self.nhead = head_num
         self.inner_dim = feedforward_dim
         self.dropout = dropout
-        self.activation = nn.ReLU()
+        self.activation = nn.Tanh() # nn.ReLU(inplace=True) # nn.Tanh() # nn.GELU() # nn.ReLU()
         self.num_layers = num_layers
 
-        self.pos_encoder = PositionEncoding(embedding_dim=self.d_model, max_length=img_w * img_h, dropout_rate = 0.1, device =device)
+        self.pos_encoder = PositionEncoding(embedding_dim=self.d_model, max_length=(img_w//4) * (img_h // 4), dropout_rate = 0.1, device =device)
         encoder_layer = TransformerEncoderLayer(model_dim=self.d_model, head_num=self.nhead, 
                 dim_feedforward=self.inner_dim, dropout=self.dropout, activation=self.activation)
         self.transformer = nn.ModuleList([

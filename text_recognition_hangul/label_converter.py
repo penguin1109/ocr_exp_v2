@@ -5,6 +5,7 @@ from jamo import h2j, j2hcj
 import os, sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from jamo_utils.jamo_split import split_syllables, split_syllable_char
 from jamo_utils.jamo_merge import join_jamos
 
 ALPHABET='abcdefghijklmnopqrstuvwxyz'
@@ -72,8 +73,26 @@ class HangulLabelConverter(object):
         for key, value in CHANGE_DICT.items():
           text = text.replace(key, value)
 
+
+        text = text.replace(' ', '') ## 원래 단어에 있는 공백은 제거하기
+        split_toks = split_syllables(text, pad=' ')
+        # print(split_toks)
+        for tok in split_toks:
+            if tok is None:
+              temp_idx = int(self.char_encoder_dict[' '])
+              label.append(temp_idx)
+              new_text += ' '
+            elif tok in self.char_encoder_dict:
+              temp_idx = int(self.char_encoder_dict[tok])
+              label.append(temp_idx)
+              new_text += tok
+            else:
+              label.append(int(self.char_encoder_dict[self.unknown_char]))
+        """
         jamo_str = j2hcj(h2j(text))
+        text = text.replace(' ', '')
         for idx, j in enumerate(jamo_str.strip(' ')):
+        
             if j != ' ':
                 new_text += j
                 try:
@@ -81,6 +100,7 @@ class HangulLabelConverter(object):
                   label.append(temp_idx)
                 except:
                   label.append(int(self.char_encoder_dict[self.unknown_char]))
+        """
         if list(set(label)) == [self.unknown_char]:
           return None
         ## (2) char_dict를 사용해서 라벨 만들기
@@ -124,3 +144,11 @@ class HangulLabelConverter(object):
 
 
 
+
+if __name__ == "__main__":
+  label_converter=HangulLabelConverter(max_length=30)
+  text = '아 진짜 짜증나 ABC123'
+  # print(split_syllables(text))
+  label = label_converter.encode(text)
+  print(torch.argmax(label,dim=-1))
+  
