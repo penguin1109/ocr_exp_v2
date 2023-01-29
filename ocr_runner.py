@@ -14,7 +14,14 @@ TEXT_RECOGNITION_MULTI=os.path.join(BASE, 'text_recognition_multi')
 sys.path.append(TEXT_DETECTION);sys.path.append(TEXT_RECOGNITION);
 
 from text_detection.detection import DetectBot
+from text_recognition_multi.predict import PredictBot
 
+def crop_images(image, bbox):
+    croped = {}
+    for idx, box in enumerate(bbox):
+        x1,y1,x2,y2=box
+        croped[idx] = image[y1:y2, x1:x2, :]
+    return croped
 
 def run_ocr(
     detection_cfg: dict, 
@@ -27,10 +34,20 @@ def run_ocr(
     detect_bot = DetectBot(
         model_path=detection_model_path, cfg=detection_cfg, remove_white=remove_white
     )
-    detected, box = detect_bot(image_path)
-
+    detected, box, image = detect_bot(image_path) ## bounding box 그려진 원본 이미지와 detection box 좌표
+    croped_dict = crop_images(image, bbox=box)
+    
     if recognition_model_path is None:
-        return detected
+        return detected ## recognition path가 없는 경우에는 그냥 감지된 영역에 bbox처리된 이미지만 return
+    else:
+        recog_bot = PredictBot(recognition_model_path)
+        pred_dict = recog_bot.predict_one_call(croped_dict)
+        
+        for idx, b in enumerate(box):
+            pred_dict[idx]['bbox'] = b
+        return pred_dict
+
+    
 
 
 if __name__ == "__main__":

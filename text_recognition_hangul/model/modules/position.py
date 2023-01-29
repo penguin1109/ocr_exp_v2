@@ -3,6 +3,8 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 import math
+from einops import rearrange
+
 """Postitional Encoding (L, C)
 - Uses the <register_buffer>
   : if you have parameters in the model, which should be saved and restored in the state_dict
@@ -25,6 +27,56 @@ def get_sinusoid_encoding_table(max_length, embedding_dim):
   sinusoid_table[:, 1::2] = torch.cos(sinusoid_table[:, 1::2]) # 홀수 index
 
   return sinusoid_table
+
+def get_position_encoding(length, hidden_dim, device):
+  pe = torch.zeros(length, hidden_dim, device=device)
+  pos = torch.arange(length)
+  pos = pos.float().unsqueeze(dim=1)
+  pe[:, 0::2] = torch.sin(pos / (10000 ** (torch.arange(0, hidden_dim, 2)/hidden_dim)))
+  pe[:, 1::2] = torch.sin(pos / (10000 ** (torch.arange(0, hidden_dim, 2)/hidden_dim)))
+
+  return pe
+
+class Adaptive2DPositionalEncoding(nn.Module):
+  def __init__(self, embedding_dim, width, height, batch_size, device=DEVICE):
+    super(Adaptive2DPositionalEncoding, self).__init__()
+    self.inter_fc = nn.Sequential(
+        nn.Linear(embedding_dim, embedding_dim//2, bias=False), nn.Tanh(), nn.Linear(embedding_dim//2, embedding_dim*2, bias=False), nn.Sigmoid()
+    )
+    pe_width = get_position_encoding(width, embedding_dim, device)
+    pe_height = get_position_encoding(height, embedding_dim, device)
+    pe_width = torch.unsqueeze(pe_width, dim=1)
+    pe_height = torch.unsqueeze(pe_height, dim=0)
+    pe_width = torch.tile(torch.unsqueeze(pe_width, dim=0), [batch_size, 1, 1, 1])
+    pe_height = torch.tile(torch.unsqueeze(pe_height, dim=0), [batch_size, 1, 1, 1])
+
+    self.register_buffer('pe_width', pe_width)
+    self.register_buffer('pe_height', pe_height)
+
+  def forward(self, x, batch_size):
+    # x: output feature map from the Shallow CNN
+    # x = [B, C, H, W]
+    B, C, H, W = x.shape
+    x = rearrange(x, 'b c h w -> b w h c')
+    # x = x.permute(0, 3,2,1) # [batch_size, width, height, embedding_dim]
+    inter = torch.mean(x, dim = (1,2))
+    alpha = self.inter_fc(inter)
+    n,c=alpha.shape
+    alpha = rearrange(alpha, 'n (a b k) -> n a b k', k=C, a=2,b=1)
+
+    # alpha = alpha.view(-1, 2, 1, C).contiguous()
+    alpha = alpha[:batch_size, :, :, :]
+    self.pe_width = self.pe_width[:batch_size, :, :, :]
+    self.pe_height = self.pe_height[:batch_size, :, :, :]
+    pos_encoding = alpha[:, 0:1, :, :] * self.pe_height + alpha[:, 1:2, :, :] * self.pe_width
+    
+    x += pos_encoding
+    B, W, H, E = x.shape
+    feature = rearrange(x, 'b w h d -> b d (h w)')
+    feature = rearrange(feature, 'b d s -> s b d', d=E, b=B) ## permute 대신에 사용
+    # feature = x.contiguous().view(B, E, -1).permute(2, 0, 1)
+
+    return x, feature
 
 class PositionEncoding(nn.Module):
   def __init__(self, 
@@ -64,7 +116,10 @@ class PositionEncoding(nn.Module):
     self.register_buffer('pe', pe)
     
   
-  def forward(self, x):
+  def forward(self, x, batch_size):
+    if len(x.shape) == 4:
+      n, c, h, w = x.shape
+      x = rearrange(x, 'n c h w -> (h w) n c', h=h,w=w,c=c)
     """ Args
     별건 아니고 1,2,3.. 순서대로 알아서 위치 정보에 대한 embedded vector을 입력 sequence에 더해 주면 결과를 모델이 알아서 학습을 하게 될 것이다.
     x: (sequence_length, batch_size, embedding_dimension)

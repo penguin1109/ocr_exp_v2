@@ -48,6 +48,8 @@ def split_syllables(s, ignore_err=True, pad=' '):
             replace = re.sub('[ sA-Za-z0-9,.()]', '', c) ## 영어나 숫자나 공백 
             if replace == '':
                 return (c,)
+            if replace == u'\u2227':
+                return (c,)
             else:
                 return '[UNK]' ## 특수 문자
 

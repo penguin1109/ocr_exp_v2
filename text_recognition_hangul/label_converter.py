@@ -24,19 +24,21 @@ class HangulLabelConverter(object):
                 add_eng=False,
                 add_special=False,
                 max_length=75,
+                blank_char=u'\u2227',
                 null_char=u'\u2591', ## 이제 텍스트 문자가 끝났음을 의미
                 unknown_char=u'\u2567'):
         if add_special:
           additional_character = SPECIAL
         else:
           additional_character = '' ## 일부 포함하고 싶은 특수 문자도 character에 추가해 준다.
-
+        self.blank_char=blank_char
         if add_num:
             additional_character += ''.join(str(i) for i in range(10))
         if add_eng:
             additional_character += ''.join(list(map(chr, range(97, 123))))
         self.char_with_no_tokens = base_character + additional_character
         additional_character += unknown_char ## 문자 dictionary에 포함되지 않는 경우에는 unknown_char 로 처리를 하도록 한다.
+        additional_character += blank_char
         self.characters = base_character + additional_character if additional_character != ''  \
             else base_character
         
@@ -74,9 +76,9 @@ class HangulLabelConverter(object):
           text = text.replace(key, value)
 
 
-        text = text.replace(' ', '') ## 원래 단어에 있는 공백은 제거하기
+        text = text.replace(' ', self.blank_char) ## 원래 단어에 있는 공백은 제거하기
         split_toks = split_syllables(text, pad=' ')
-        # print(split_toks)
+        #print(split_toks)
         for tok in split_toks:
             if tok is None:
               temp_idx = int(self.char_encoder_dict[' '])
@@ -124,18 +126,22 @@ class HangulLabelConverter(object):
             scores=scores.unsqueeze(0)
             
         for score in scores:
-            score_ = score.argmax(dim=1)
+            # score_ = torch.argmax(F.softmax(score, dim=-1), dim=1)
+            score_ =torch.argmax(F.softmax(score, dim=-1), dim=-1)
             text = ''
             for idx, s in enumerate(score_):
                 temp = self.char_decoder_dict[s.item()]
                 if temp == self.null_char:
                   break
-                if temp == self.unknown_char:
+                if temp == self.unknown_char: ## 특수 문자등과 같이 예측 대상 character이 아닌 경우
                     text += ''
+                if temp == self.blank_char: ## 종성의 None과는 다른 단어사이의 공
+                    text += temp
                 else:
                     text += temp
             ## (2) 자음과 모음이 분리되어 있는 문자열을 하나의 글자로 merge
             text = join_jamos(text)
+            text = text.replace(self.blank_char, ' ')
             pred_text.append(text)
             pred_scores.append(score.max(dim=1)[0])
             pred_lengths.append(min(len(text)+1, self.max_length))
@@ -149,6 +155,8 @@ if __name__ == "__main__":
   label_converter=HangulLabelConverter(max_length=30)
   text = '아 진짜 짜증나 ABC123'
   # print(split_syllables(text))
-  label = label_converter.encode(text)
+  label = label_converter.encode(text, one_hot=True)
+  print(label.shape)
+  print(label)
   print(torch.argmax(label,dim=-1))
   

@@ -193,7 +193,7 @@ class DetectBot(object):
       detected_boxes = self.predict(diff_h=croped_point[2], diff_w=croped_point[0], image=croped_image)
       all_box.extend(detected_boxes)
       original_image = draw_box(original_image, detected_boxes)
-    return original_image, all_box
+    return original_image, all_box, image
 
 
 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
   FILE_PATH=os.path.join(BASE, 'demo', 'sample', 'recipt3.jpg')
   #detected = detect(cfg, FILE_PATH, MODEL_PATH)
   bot = DetectBot(MODEL_PATH, remove_white=True)
-  detected,box = bot(FILE_PATH)
+  detected,box, image = bot(FILE_PATH)
   cv2.imwrite(FILE_PATH.split('.')[0] + '_result' + '.jpg', detected)
  # os.chdir()
  # drawn_image = detect()

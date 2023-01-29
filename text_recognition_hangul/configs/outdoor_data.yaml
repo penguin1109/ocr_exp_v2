@@ -1,25 +1,37 @@
 MODEL_CFG:
-  PRETRAINED: '' # '/home/guest/ocr_exp_v2/weight/2023-01-23_min_loss.pth'
-  PRETRAINED_OPTIM: '' 
+  PRETRAINED: ''
+  USE_RES: !!bool true
+  PRETRAINED_OPTIM: ''
+  ADAPTIVE_PE: !!bool true
+  BATCH_SIZE: !!int 300
   RES_IN: 32
   MAX_SEQ_LENGTH: 30 #75
+  ENCODER_LAYER_NUM: !!int 2 # 5 # 12 # 4
   EMBEDDING_DIM: 512
+  FEED_FORWARD_DIM: 2048
+  HEAD_NUM: !!int 8
   IMG_W: 192
   IMG_H: 32 # 128
+  ACTIVATION: !!str 'TANH'
+  RGB: !!bool true ## Outdoor Data는 거의 무조건 RGB이미지를 사용해야 한다
 
 TRAIN_CFG:
-  LOSS_FN: 'CE'
+  DEBUG: !!bool false
+  LOSS_FN: 'CE' # 'FOCAL'
   OPTIMIZER: 'ADAM'
-  LR: !!float 1e-3
-  BATCH_SIZE: 200
+  SCHEDULER: 'COSINE'
+  MOMENTUM: 0.9
+  LR: !!float 1e-4
+  BATCH_SIZE: 300
   EPOCH: !!int 100
   EVAL_EPOCH: !!int 10
   WEIGHT_FOLDER: '/home/guest/ocr_exp_v2/weight'
-  OPTIM_FOLDER: '/home/guest/ocr_exp_v2/text_recognition_hangul/optim'
+  OPTIM_FOLDER: '/home/guest/ocr_exp_v2/optim'
 
 DATA_CFG:
   DATASET: 'HENDatasetOutdoor'
   USE_OUTDOOR: !!bool true
+  RGB: true
   MEAN: [0.5,0.1,0.4]
   STD: [0.3,0.5,0.3]
   BASE_FOLDER: '/home/guest/ocr_exp_v2/data/croped_outdoor' ## 학습을 text_recognition 폴더 내에서 시킬 것이기 때문에 

@@ -109,8 +109,8 @@ class HENDatasetOutdoor(BaseDataset):
       text = i['text']
       label = self.label_converter.encode(text, padding=False, one_hot=False)
       if len(label)> self.max_length:
-        print(text)
-        print(i['image'])
+        #print(text)
+        # print(i['image'])
         self.label_data.remove(i)
         self.image_files.remove(os.path.join(self.base_dir, i['image']))
 
@@ -119,21 +119,29 @@ class HENDatasetOutdoor(BaseDataset):
       select = idx
     else:
       select = random.choice(self.image_files)
+      # print(select)
     for label in self.label_data: ## 이미지 데이터에 맞는 라벨 데이터를 찾아줄 수 있다.
       if label['image'] == select.split('/')[-1]:
         break
     text = label['text']
 
     image = cv2.imread(select)
+    if self.data_cfg['RGB'] == False:
+      image = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+      mean, std = self.data_cfg['GRAY_MEAN'], self.data_cfg['GRAY_STD']
+    else:
+      mean, std = self.data_cfg['MEAN'], self.data_cfg['STD']
+
     image = cv2.resize(image, (self.img_w, self.img_h))
+    
     tensor_image = transforms.Compose([
       transforms.ToTensor(),
-      transforms.Normalize(mean=self.data_cfg['MEAN'], std=self.data_cfg['STD'])
+      transforms.Normalize(mean=mean, std=std)
     ])(image)
-
+    
     label = self.label_converter.encode(text, padding=True, one_hot=True)
 
-    return tensor_image, label, text
+    return tensor_image, label, text, select
 
 class HENDatasetV2(BaseDataset):
   ## 오직 인쇄체 데이터셋만을 사용하기 위한 데이터셋
@@ -177,16 +185,30 @@ class HENDatasetV2(BaseDataset):
   def __getitem__(self, idx):
 
     image = cv2.imread(self.image_files[idx])
-    image = cv2.resize(image, (self.img_w, self.img_h))
+    if self.data_cfg['RGB'] == False:
+      image = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+      mean, std = self.data_cfg['GRAY_MEAN'], self.data_cfg['GRAY_STD']
+    else:
+      mean, std = self.data_cfg['MEAN'], self.data_cfg['STD']
+
+    # image = cv2.resize(image, (self.img_w, self.img_h))
+    
     tensor_image = transforms.Compose([
       transforms.ToTensor(),
-      transforms.Normalize(self.data_cfg['MEAN'], self.data_cfg['STD'])
+       transforms.Resize((self.img_h, self.img_w)),
+      transforms.Normalize(mean=mean, std=std)
     ])(image)
 
-    text = self.label_data[idx]['text']
-    label = self.label_converter.encode(text, padding=True, one_hot=True)
+    for label_data in self.label_data:
+      if label_data['image'] == self.image_files[idx]:
+        break
 
-    return tensor_image, label, text
+
+    text = label_data['text']
+    label = self.label_converter.encode(text, padding=True, one_hot=True)
+    # label = label.type(torch.LongTensor)
+
+    return tensor_image, label, text , self.image_files[idx]
 
 
 
@@ -265,50 +287,3 @@ class HENDataset(BaseDataset):
           image_file_dict[dtype] = list(map(lambda x: os.path.join(new_dir, x), sorted(os.listdir(new_dir))))
     self.image_file_dict = image_file_dict
 
-if __name__ == "__main__":
-  import yaml
-  import numpy as np
-  import torch
-  import torch.nn.functional as F
-  from torch.utils.data import DataLoader
-  with open('/home/guest/ocr_exp_v2/text_recognition_hangul/configs/printed_data.yaml', 'r') as f:
-    cfg = yaml.load(f, Loader=yaml.FullLoader)
-  dataset = HENDatasetV2(mode='debug', DATA_CFG=cfg['DATA_CFG'])
-  print(len(dataset))
-  # print(dataset.label_converter.char_with_no_tokens)
-  loader = DataLoader(dataset, batch_size=30)
-  MEAN=[0.0,0.0,0.0];STD=[0,0,0];
-  NUMS = len(loader)
-  from tqdm import tqdm
-  loop = tqdm(loader)
-
-  for idx, batch in enumerate(loop):
-    image, label, text = batch
-    print(image[0].max())
-    print(image[0].min())
-    # print(text)
-
-  """ MEAN & STD FINDING
-  for idx, batch in enumerate(loop):
-    image, label, text = batch
-    # print(' '.join(text))
-    for b in range(image.shape[0]):
-      #print(image[b].shape)
-      #print(np.unique(np.array(image[b].detach().cpu().numpy())))
-      
-      cv2.imwrite(f"{b}.png", image[b].detach().permute(1,2 ,0).cpu().numpy()*255)
-    for c in range(3):
-      MEAN[c] += image[:,c,:,:].mean()
-      STD[c] += image[:, c, :, :].std()
-    if idx == 3:
-      break
-  from loguru import logger
-  for i in range(3):
-    MEAN[i] /= idx
-    STD[i] /= idx
-  logger.info(f"MEAN: {MEAN}")
-  logger.info(f"STD: {STD}")
-      # print(image[:,c,:,:].mean())
-      # print(image[:, c,:,:].std())
-    # break
-  """

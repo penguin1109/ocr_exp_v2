@@ -39,7 +39,8 @@ def join_jamos(s: str, ignore_err=True):
         return result
     
     for char in s:
-        if char not in CHARSET:
+
+        if char not in CHARSET and char != ' ':
             if queue:
                 new_c = flush() + char
             else:
@@ -49,20 +50,32 @@ def join_jamos(s: str, ignore_err=True):
                     new_c = ''
             last_t = 0
         else:
+            if (char == ' '):
+                ## char type 257은 종성을 의미하는 번호이다.
+                t = 257 ## 공백은 무조건 종성에만 사용하는 방법으로 가도록 한다.
+                continue
+            if (char == u'\u2227'):
+                t = 0
+                new_c = flush()
+                continue
             t = get_jamo_type(char)
             new_c = None
-            if t & FINAL == FINAL:
+            if (t & FINAL == FINAL):
+                # print(f"FINAL : {t} LAST T : {last_t}")
                 if not (last_t == MEDIAL):
+                    # print("NOT MED")
                     new_c = flush()
             elif t == INITIAL:
+                # print(f"INITIAL : {t}")
                 new_c = flush()
             elif t == MEDIAL:
+                # print(f"MEDIAL : {t}")
                 if last_t & INITIAL ==INITIAL:
                     new_c = flush(1)
                 else:
                     new_c = flush()
             last_t = t
-            queue.insert(0, char)
+            queue.insert(0, char)## 제일 최근 문자열은 앞에 넣어줌
                 
         if new_c:
             new_string += new_c

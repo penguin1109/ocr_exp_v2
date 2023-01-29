@@ -28,7 +28,7 @@ class FocalLoss(nn.Module):
     
     mask = torch.zeros(batch_size, max_length)
     for i in range(batch_size):
-      mask[i, :length[i]].fill_(1)
+      mask[i, :length[i]].fill_(1) ## 실제 정답인 것에 대해서 length를 구해 준다.
     mask = mask.type_as(prediction)[:, :max_length]
     
     prediction = to_contiguous(prediction).view(-1, prediction.size(2))

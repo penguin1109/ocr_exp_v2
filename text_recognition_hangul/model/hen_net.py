@@ -5,6 +5,7 @@ import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from encoder import ResTransformer
 from decoder import AttentionalDecoder
+from einops import rearrange
 DEVICE=torch.device("cuda:6") if torch.cuda.is_available() else torch.device("cpu")
 """ Hangul Net
 1. ResModel (ResNet45)
@@ -14,19 +15,32 @@ DEVICE=torch.device("cuda:6") if torch.cuda.is_available() else torch.device("cp
 """
 class HENNet(nn.Module):
   def __init__(self, 
-              img_w, img_h, res_in, head_num,
+              img_w, img_h, res_in, head_num, encoder_layer_num, 
+              activation, use_resnet, adaptive_pe, batch_size,seperable_ffn,
+                rgb=False,
                max_seq_length=75, ## 논문의 저자들이 지정한 가장 긴 길이의 sequence length인데, 75라는 것은 총 문자의 개수가 25개라는 것이다.
                embedding_dim=512, ## transformer encoder에서 model output의 dimension을 나타냄
                class_n=52, ## 한글에서의 초성-중성-종성의 개수를 나타냄
                ):
     super(HENNet, self).__init__()
     #self.resnet = resnet45()
+    if activation.upper() == 'RELU':
+      activation = nn.ReLU(inplace=True)
+    elif activation.upper() == 'LEAKYRELU':
+      activation = nn.LeakyReLU()
+    elif activation.upper() == 'GELU':
+      activation = nn.GELU()
+    elif activation.upper() == 'TANH':
+      activation = nn.Tanh()
+
     self.transformer_encoder = ResTransformer(
-      img_w=img_w, img_h=img_h, res_in=res_in, 
-      device=torch.device('cuda:6'),head_num=head_num,
-      model_dim=embedding_dim) # 이 안에 ResNet45가 있음
+      img_w=img_w, img_h=img_h, res_in=res_in, rgb=rgb,use_resnet=use_resnet,
+      adaptive_pe=adaptive_pe, batch_size=batch_size,seperable_ffn=seperable_ffn,
+      device=torch.device('cuda:6'), activation=activation, head_num=head_num,
+      model_dim=embedding_dim, num_layers=encoder_layer_num) # 이 안에 ResNet45가 있음
+    
     self.attention_decoder = AttentionalDecoder( 
-              img_h=img_h, img_w=img_w,
+              img_h=img_h, img_w=img_w,  activation=activation,
                in_channel=embedding_dim,
                unet_channel=64,
                max_seq_length=max_seq_length,
@@ -34,10 +48,10 @@ class HENNet(nn.Module):
     self.cls = nn.Linear(embedding_dim, class_n) # (N, T, Embed Dim) -> (N, T, Grapheme Class #)
 
   
-  def forward(self, x):
+  def forward(self, x,batch_size, mode='train'):
     #feature = self.resnet(x)
     #logger.info(feature.shape)
-    encoder_out = self.transformer_encoder(x)
+    encoder_out, attn_weight = self.transformer_encoder(x, batch_size)
     att_vec, att_score = self.attention_decoder(encoder_out)
 
     pred = self.cls(att_vec) # (Batch #, Seq Length, Grapheme Class #)
@@ -45,8 +59,11 @@ class HENNet(nn.Module):
     return pred
 
 if __name__ == "__main__":
-  net = HENNet(img_w=128, img_h=32, res_in=32, max_seq_length=30, embedding_dim=512, class_n=54).to(DEVICE)
-  sample = torch.rand((1, 3, 32,128)).to(DEVICE)
+  net = HENNet(img_w=192, img_h=32, res_in=32, max_seq_length=30,\
+   embedding_dim=512, class_n=54, encoder_layer_num=2, use_resnet=False, \
+   head_num=8, activation = 'tanh', \
+   adaptive_pe=True, batch_size=2, rgb=False).to(DEVICE)
+  sample = torch.rand((2, 1, 32,192)).to(DEVICE)
 
-  out = net(sample)
+  out = net(sample, mode='train', batch_size=30)
   print(out.shape) ## (Batch Size, Max Sequence Length, Class Number)
