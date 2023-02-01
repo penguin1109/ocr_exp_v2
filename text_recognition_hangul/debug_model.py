@@ -25,19 +25,20 @@ class SimpleCNN(nn.Module):
 if __name__ == "__main__":
   import yaml
   import numpy as np
+  import torchvision
   import os, json, sys, cv2
   import torch
   import torch.nn.functional as F
   from torch.utils.data import DataLoader
   from model.hen_net import HENNet
   import matplotlib.pyplot as plt
-  from dataset import HENDatasetOutdoor, HENDatasetV2
+  from dataset import HENDatasetOutdoor, HENDatasetV2, HENDatasetV3
   from einops import rearrange
 
   DEVICE = torch.device("cuda:6") if torch.cuda.is_available() else torch.device('cpu')
-  with open('/home/guest/ocr_exp_v2/text_recognition_hangul/configs/printed_data.yaml', 'r') as f:
+  with open('/home/guest/ocr_exp_v2/text_recognition_hangul/configs/multi_data.yaml', 'r') as f:
     cfg = yaml.load(f, Loader=yaml.FullLoader)
-  dataset = HENDatasetV2(mode='train', DATA_CFG=cfg['DATA_CFG'])
+  dataset = HENDatasetV3(mode='train', DATA_CFG=cfg['DATA_CFG'])
   #dataset= HENDatasetOutdoor(mode='train', DATA_CFG=cfg['DATA_CFG'])
   label_converter = dataset.label_converter;
   model_cfg = cfg['MODEL_CFG']
@@ -50,23 +51,36 @@ if __name__ == "__main__":
       adaptive_pe=model_cfg['ADAPTIVE_PE'],
       seperable_ffn=model_cfg['SEPERABLE_FFN'],
       use_resnet=model_cfg['USE_RES'],
+      tps=model_cfg['TPS'],
       batch_size=model_cfg['BATCH_SIZE'],
       rgb=model_cfg['RGB'],
       head_num=model_cfg['HEAD_NUM'],
       max_seq_length=model_cfg['MAX_SEQ_LENGTH'],
       embedding_dim=model_cfg['EMBEDDING_DIM'],
       class_n=len(label_converter.characters)).to(DEVICE)
-  #model.load_state_dict(torch.load(
-  #  '/home/guest/ocr_exp_v2/weight/convFFN_layer6_relu_3e_5_REARRANGE/2023-01-28_min_loss.pth'))
+  model.load_state_dict(torch.load(
+     '/home/guest/ocr_exp_v2/weight/layer5_relu_MULTI_NORM_0to1_ADAM_STEP/2023-01-31_min_loss.pth'))
   print("===All Keys Matched Sucessfullly===")
   # print(dataset.label_converter.char_with_no_tokens)
-  loader = DataLoader(dataset, batch_size=30)
+  loader = DataLoader(dataset, batch_size=10)
   MEAN=[0.5,0.5,0.5];STD=[0.5,0.5,0.5];
   NUMS = len(loader)
   from tqdm import tqdm
   loop = tqdm(loader)
   IMAGE=[]
   
+  image = cv2.imread('/home/guest/ocr_exp_v2/text_recognition_hangul/debug/num2.jpg')
+  image = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+  print(f"IMAGE SHAPE: {image.shape}")
+  image = torchvision.transforms.Compose([
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Resize((32, 192)),
+    torchvision.transforms.Normalize(0.0, 1.0)
+  ])(image)
+  cv2.imwrite('/home/guest/ocr_exp_v2/text_recognition_hangul/debug/num_1_trans.jpg',255* image.cpu().permute(1,2,0).numpy())
+  pred = model(torch.unsqueeze(image, 0).to(DEVICE), batch_size=1, mode='train')
+
+  print(label_converter.decode(pred))
   with open('debug.txt', 'w') as f:
     for name, param in model.named_parameters():
       if param.requires_grad:

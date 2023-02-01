@@ -1,12 +1,15 @@
-from dataset import HENDatasetV2, HENDatasetOutdoor
+from dataset import HENDatasetV2, HENDatasetOutdoor, HENDatasetV3
 import torch
 import torch.nn.functional as F
+from torch.utils.data import Dataset, ConcatDataset
 from jamo_utils import jamo_merge, jamo_split
-from label_converter import HangulLabelConverter
+from label_converter import HangulLabelConverter, GeneralLabelConverter
 import yaml, os, json
 
 YAML_DIR='/home/guest/ocr_exp_v2/text_recognition_hangul/configs'
-YAML_NAME='printed_data.yaml'
+YAML_NAME='medicine_data.yaml'
+# YAML_NAME='multi_data.yaml'
+# YAML_NAME='printed_data.yaml'
 # YAML_NAME='outdoor_data.yaml'
 with open(os.path.join(YAML_DIR, YAML_NAME), 'r') as f:
     CONFIG = yaml.load(f, Loader=yaml.FullLoader)
@@ -21,7 +24,8 @@ data_cfg = CONFIG['DATA_CFG']
 #     META_DATA=json.load(f)['annotations']
 
 # print(META_DATA[0:len(META_DATA):10])
-CONVERTER = HangulLabelConverter(add_num=False, add_eng=False, add_special=False, max_length=30)
+CONVERTER = GeneralLabelConverter(max_length = data_cfg['MAX_LENGTH'] // 3)
+# CONVERTER = HangulLabelConverter(add_num=True, add_eng=True, add_special=False, max_length=45)
 # print(CONVERTER.characters) ## null, 중성 없음, 자-모음, unknown
 
 pred = CONVERTER.encode('아니양 같아',) #  one_hot=False)
@@ -35,12 +39,22 @@ if 'outdoor' in YAML_NAME:
     dataset = HENDatasetOutdoor(mode='train', DATA_CFG=data_cfg)
 elif 'printed' in YAML_NAME:
     dataset = HENDatasetV2(mode='train',DATA_CFG=data_cfg)
-
+elif 'multi' in YAML_NAME:
+    datasets = []
+    datasets.append(HENDatasetV3(mode='train', DATA_CFG=data_cfg))
+    datasets.append(HENDatasetV2(mode='train', DATA_CFG=data_cfg))
+    dataset = ConcatDataset(datasets)
+elif 'medicine' in YAML_NAME:
+    dataset = HENDatasetV3(mode='train', DATA_CFG=data_cfg)
+    # dataset = HENDatasetV3(mode='train', DATA_CFG=data_cfg)
 loader = torch.utils.data.DataLoader(dataset, batch_size=30, shuffle=True)
 for idx, batch in enumerate(loader):
     image, label, text, file_name = batch
-    print(text, file_name)
+    print(text, file_name,)
     break
+print(label.shape) ## [Batch Size, Max Length, Class # ]
+for l in label:
+    print(torch.argmax(l, dim=-1))
 """
 # print(dataset.image_files[:10])
 # print(dataset.label_data[:10])

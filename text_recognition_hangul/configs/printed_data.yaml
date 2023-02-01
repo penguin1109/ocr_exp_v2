@@ -1,9 +1,10 @@
 MODEL_CFG:
-  PRETRAINED: ''
+  PRETRAINED: '/home/guest/ocr_exp_v2/weight/layer5_relu_1e_4_REARRANGE_SEPFFN/2023-01-29_min_loss.pth'
   USE_RES: !!bool true # true # false
   SEPERABLE_FFN: !!bool true # false # true #  false ## Transformer Encoder의 FFN을 Convolution을 사용할지 말지
-  PRETRAINED_OPTIM: ''
+  PRETRAINED_OPTIM: '/home/guest/ocr_exp_v2/optim/layer5_relu_1e_4_REARRANGE_SEPFFN/2023-01-29.pth'
   ADAPTIVE_PE: !!bool false # true
+  TPS: !!bool false
   BATCH_SIZE: !!int 300 # 128 # 300
   RES_IN: 32
   MAX_SEQ_LENGTH: 30 #75
@@ -21,7 +22,7 @@ TRAIN_CFG:
   OPTIMIZER: 'ADAM'
   SCHEDULER: 'COSINE' # 'CYCLIC' # 'STEP'
   MOMENTUM: 0.9
-  LR: !!float 1e-4 # 1e-4 ## 3e-4 ## => 신기하게 ADAM은 1e-4 ~ 1e-5를 시작으로 잡는 것이, SGD는 0.1 ~ 0.01 정도를 시작 learning rate로 잡는 것이 효과적이다.
+  LR: !!float 3e-5 # 1e-4 ## 3e-4 ## => 신기하게 ADAM은 1e-4 ~ 1e-5를 시작으로 잡는 것이, SGD는 0.1 ~ 0.01 정도를 시작 learning rate로 잡는 것이 효과적이다.
   DEBUG: !!bool false
   BATCH_SIZE: 300 #  128 # 300
   EPOCH: !!int 100
@@ -30,7 +31,9 @@ TRAIN_CFG:
   OPTIM_FOLDER: '/home/guest/ocr_exp_v2/optim'
 
 DATA_CFG:
-  DATASET: 'HENDatasetV2'
+  DATASET: 
+    - 'HENDatasetV2'
+    # - 'HENDatasetV3'
   USE_OUTDOOR: !!bool false
   BASE_FOLDER: '/home/guest/ocr_exp_v2/data/printed_text' ## 학습을 text_recognition 폴더 내에서 시킬 것이기 때문에 
   RGB: false

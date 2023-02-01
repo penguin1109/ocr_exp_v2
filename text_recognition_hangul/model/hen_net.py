@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from transformation import TPS_SpatialTransformerNetwork
 from encoder import ResTransformer
 from decoder import AttentionalDecoder
 from einops import rearrange
@@ -15,7 +16,7 @@ DEVICE=torch.device("cuda:6") if torch.cuda.is_available() else torch.device("cp
 """
 class HENNet(nn.Module):
   def __init__(self, 
-              img_w, img_h, res_in, head_num, encoder_layer_num, 
+              img_w, img_h, res_in, head_num, encoder_layer_num, tps,
               activation, use_resnet, adaptive_pe, batch_size,seperable_ffn,
                 rgb=False,
                max_seq_length=75, ## 논문의 저자들이 지정한 가장 긴 길이의 sequence length인데, 75라는 것은 총 문자의 개수가 25개라는 것이다.
@@ -32,7 +33,13 @@ class HENNet(nn.Module):
       activation = nn.GELU()
     elif activation.upper() == 'TANH':
       activation = nn.Tanh()
-
+    
+    if rgb:
+      in_ch=3
+    else:in_ch=1
+    if tps:
+      self.transformation = TPS_SpatialTransformerNetwork(F=20, I_size=(img_h, img_w), I_r_size=(img_h, img_w), I_channel_num=in_ch)
+    self.tps=tps
     self.transformer_encoder = ResTransformer(
       img_w=img_w, img_h=img_h, res_in=res_in, rgb=rgb,use_resnet=use_resnet,
       adaptive_pe=adaptive_pe, batch_size=batch_size,seperable_ffn=seperable_ffn,
@@ -51,6 +58,9 @@ class HENNet(nn.Module):
   def forward(self, x,batch_size, mode='train'):
     #feature = self.resnet(x)
     #logger.info(feature.shape)
+    if self.tps:
+      x = self.transformation(x)
+
     encoder_out, attn_weight = self.transformer_encoder(x, batch_size)
     att_vec, att_score = self.attention_decoder(encoder_out)
 

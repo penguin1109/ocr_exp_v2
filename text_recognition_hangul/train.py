@@ -3,12 +3,15 @@ import torch
 import torch.nn as nn
 from torch.nn import CTCLoss, CrossEntropyLoss
 import os, sys
+
 from loss import FocalLoss, SoftCrossEntropyLoss
 from torch.optim.lr_scheduler import CyclicLR
+from torch.utils.data import ConcatDataset
 from scheduler import CosineAnnealingWarmUpRestarts
 
 USE_CUDA=torch.cuda.is_available()
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from label_converter import HangulLabelConverter, GeneralLabelConverter
 DEVICE=torch.device('cuda:6' if USE_CUDA else 'cpu')
 
 class MYCE(nn.Module):
@@ -44,7 +47,8 @@ def make_loss_fn(train_cfg):
     criterion = FocalLoss()
   return criterion
 
-def train_one_epoch(model, train_dataloader, optimizer,  train_cfg):
+def train_one_epoch(model, train_dataloader, optimizer, \
+                 train_cfg, epoch, label_converter, scheduler):
   loop=tqdm(train_dataloader)
   model.train()
   torch.set_grad_enabled(True)
@@ -82,12 +86,12 @@ def train_one_epoch(model, train_dataloader, optimizer,  train_cfg):
     optimizer.step() ## update parameters
     #label.detach();image.detach();pred.detach();
 
-    loop.set_postfix({"loss": loss.detach()})
-    pred_text,_,_ = train_loader.dataset.label_converter.decode(pred)
+    loop.set_postfix({"loss": loss.detach().item(), "epoch": epoch, "lr": optimizer.param_groups[0]['lr']})
+    pred_text,_,_ = label_converter.decode(pred)
     print(pred_text)
   epoch_metric = torch.mean(torch.stack([x for x in outs]))
-
-  return epoch_metric, model, optimizer
+  scheduler.step()
+  return epoch_metric, model, optimizer, scheduler
 
 def test_one_epoch(model, test_dataloader, converter):
   loop = tqdm(test_dataloader)
@@ -172,7 +176,7 @@ import datetime
 TODAY=datetime.datetime.now()
 TODAY=TODAY.strftime('%Y-%m-%d')
 CONFIG_DIR='/home/guest/ocr_exp_v2/text_recognition_hangul/configs'
-from dataset import HENDataset, HENDatasetV2, HENDatasetOutdoor
+from dataset import HENDataset, HENDatasetV2, HENDatasetOutdoor, HENDatasetV3
 from model.hen_net import HENNet
 
 if __name__ == "__main__":
@@ -194,26 +198,44 @@ if __name__ == "__main__":
   os.makedirs(os.path.join(train_cfg['WEIGHT_FOLDER'], exp_name), exist_ok=True)
   os.makedirs(os.path.join(train_cfg['OPTIM_FOLDER'], exp_name), exist_ok=True)
 
-  if 'Outdoor' in data_cfg['DATASET']:
+  use_datasets = []
+  if 'HENDatasetOutdoor' in data_cfg['DATASET']:
     train_dataset = HENDatasetOutdoor(mode='train', DATA_CFG=data_cfg)
-    test_dataset = HENDatasetOutdoor(mode='test', DATA_CFG=data_cfg)
-    debug_dataset = HENDatasetOutdoor(mode='debug', DATA_CFG=data_cfg)
-  elif 'V2' in data_cfg['DATASET']:
+    use_datasets.append(train_dataset)
+
+  if 'HENDatasetV2' in data_cfg['DATASET']:
     train_dataset = HENDatasetV2(mode='train', DATA_CFG=data_cfg)
-    test_dataset = HENDatasetV2(mode='test', DATA_CFG=data_cfg)
-    debug_dataset = HENDatasetV2(mode='debug', DATA_CFG=data_cfg)
+    use_datasets.append(train_dataset)
+    
+  if 'HENDatasetV3' in data_cfg['DATASET']:
+    train_dataset = HENDatasetV3(mode='train', DATA_CFG=data_cfg)
+    use_datasets.append(train_dataset)
+
+  ## MAKE THE CONCATENATED DATASET ##
+  train_dataset = ConcatDataset(use_datasets) 
+  if 'V3' in data_cfg['DATASET']:
+    test_dataset = HENDatasetV3(mode='test', DATA_CFG=data_cfg) ## TEST WITH DATA WITH V2 or V3
   else:
-    train_dataset = HENDataset(mode='train', DATA_CFG=data_cfg)
-    test_dataset = HENDataset(mode='test', DATA_CFG=data_cfg)
-    debug_dataset = HENDataset(mode='debug', DATA_CFG=data_cfg)
+    test_dataset = HENDatasetV2(mode= 'test', DATA_CFG=data_cfg)
+
+  debug_dataset = HENDatasetV2(mode='debug', DATA_CFG=data_cfg)
 
   train_loader = DataLoader(train_dataset, batch_size=train_cfg['BATCH_SIZE'], shuffle=True, drop_last=True)
   test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
   debug_loader = DataLoader(debug_dataset, batch_size = 30, shuffle=True)
 
-  label_converter = train_dataset.label_converter
+  ### LABEL CONVERTER LOAD ###
+  if data_cfg['CONVERTER'] == 'general':
+    label_converter = GeneralLabelConverter(max_length = data_cfg['MAX_LENGTH'] // 3)
+  
+  else:
+    label_converter = HangulLabelConverter(
+      base_character=''.join(data_cfg['BASE_CHARACTERS']), add_num=data_cfg['ADD_NUM'], add_eng=data_cfg['ADD_ENG'],
+      add_special=data_cfg['ADD_SPECIAL'], max_length=data_cfg['MAX_LENGTH']
+    )
+  logger.info(f"CHARACTER NUM: {len(label_converter.char_decoder_dict)} MAX LENGTH: {label_converter.max_length}")
   ### MODEL LOAD ####
-
+  
   model = HENNet(
       img_w=model_cfg['IMG_W'], img_h=model_cfg['IMG_H'], res_in=model_cfg['RES_IN'],
       encoder_layer_num=model_cfg['ENCODER_LAYER_NUM'], 
@@ -223,8 +245,9 @@ if __name__ == "__main__":
       adaptive_pe=model_cfg['ADAPTIVE_PE'],
       batch_size=model_cfg['BATCH_SIZE'],
       rgb=model_cfg['RGB'],
+      tps=model_cfg['TPS'],
       head_num=model_cfg['HEAD_NUM'],
-      max_seq_length=model_cfg['MAX_SEQ_LENGTH'],
+      max_seq_length=label_converter.max_length, # model_cfg['MAX_SEQ_LENGTH'],
       embedding_dim=model_cfg['EMBEDDING_DIM'],
       class_n=len(label_converter.characters)) 
   
@@ -242,15 +265,16 @@ if __name__ == "__main__":
   if model_cfg['PRETRAINED_OPTIM'] != '':
     optimizer.load_state_dict(torch.load(model_cfg['PRETRAINED_OPTIM']))
   #optimizer = torch.optim.Adagrad(model.parameters(), lr=1.0) ## Adagrad는 알아서 adaptive learning rate를 찾아가기 때문에 처음 learning rate는 1이어야 한다.
-  
+  # for g in optimizer.param_groups:
+  #   g['lr'] = train_cfg['LR']
   ### SCHEDULER SETUP ###
   if train_cfg['SCHEDULER'] == 'CYCLIC':
     cycle_momentum=False if isinstance(optimizer, torch.optim.Adam) else True
-    scheduler = CyclicLR(optimizer, base_lr = train_cfg['LR'], max_lr=0.01, \
-          step_size_up=250000, step_size_down=None, mode='triangular2', \
+    scheduler = CyclicLR(optimizer, base_lr = train_cfg['LR'], max_lr=train_cfg['LR'] * 10, \
+          step_size_up=2500, step_size_down=None, mode='triangular2', \
           cycle_momentum=cycle_momentum)
   elif train_cfg['SCHEDULER'] == 'STEP':
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
   
   elif train_cfg['SCHEDULER'] == 'COSINE':
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100, eta_min=0)
@@ -267,21 +291,25 @@ if __name__ == "__main__":
 
   logger.info("==== START TRAINING ====")
   for epoch in range(train_cfg['EPOCH']):
-    epoch_loss, model, optimizer = train_one_epoch(model, train_loader, optimizer,  train_cfg)
+    epoch_loss, model, optimizer, scheduler = train_one_epoch(model, train_loader, optimizer,  train_cfg, epoch, label_converter, scheduler)
    
     if epoch_loss < min_loss:
       min_loss = epoch_loss
       torch.save(model.state_dict(), os.path.join(train_cfg['WEIGHT_FOLDER'],exp_name, f"{TODAY}_min_loss.pth"))
     if (epoch+1) % train_cfg['EVAL_EPOCH'] == 0:
       logger.info("=== START EVALUATION ===")
-      accuracy = test_one_epoch(model, test_loader, label_converter, )
+      accuracy = test_one_epoch(model, test_loader, label_converter)
       if max_acc < accuracy:
         mac_acc = accuracy
         torch.save(model.state_dict(), os.path.join(train_cfg['WEIGHT_FOLDER'],exp_name, f"{TODAY}_best.pth"))
     torch.save(model.state_dict(), os.path.join(train_cfg['WEIGHT_FOLDER'],exp_name, f"{TODAY}.pth"))
     torch.save(optimizer.state_dict(), os.path.join(train_cfg['OPTIM_FOLDER'],exp_name, f"{TODAY}.pth"))
 
-    scheduler.step()
+    if isinstance(train_dataset, torch.utils.data.ConcatDataset):
+      for ds in train_dataset.datasets:
+        ds._shuffle()
+        
+    # scheduler.step()
     logger.info(f"EPOCH: {epoch+1} LR: {scheduler.get_last_lr()} LOSS: {epoch_loss}")
 
 

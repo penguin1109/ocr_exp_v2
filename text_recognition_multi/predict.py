@@ -15,6 +15,7 @@ class CFG(object):
         self.FeatureExtraction='ResNet'
         self.SequenceModeling='BiLSTM'
         self.Prediction='CTC'
+        ## Transformation을 하기 때문에 이미지의 크기가 중요한 요소이다.
         self.imgH=64
         self.imgW=200
         self.input_channel=1
@@ -25,14 +26,23 @@ class CFG(object):
         self.num_class = len(self.character) + 1
         self.batch_max_length=25
 
-class PredictBot(object):
-    def __init__(self):
+class CLOVAPredictBot(object):
+    def __init__(self, recognition_model_path):
         self.opt = CFG()
         self.converter = CTCLabelConverter(self.opt.character)
         self.model = Model(opt=self.opt)
         self.device = torch.device('cuda:6' if torch.cuda.is_available() else 'cpu')
+        pretrained = torch.load(recognition_model_path)
+        new_pretrained = {}
+        for key, value in pretrained.items():
+            new_k = '.'.join(key.split('.')[1:])
+            new_pretrained[new_k] = value
+        self.model.load_state_dict(new_pretrained)
         
     def predict_single(self, image):
+        h, w, c = image.shape
+        if c == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         image = transforms.Compose([
                 transforms.ToTensor(),
                 transforms.Resize((self.opt.imgH, self.opt.imgW))
@@ -49,21 +59,24 @@ class PredictBot(object):
 
         pred = self.model(image, text_for_pred)
         pred_size = torch.IntTensor([pred.size(1)] * batch_size)
-        _, pred_index = pres.max(2)
-        pred_str = self.converter.decode(pred_str.data, pred_size.data)
+        _, pred_index = pred.max(2)
+        pred_str = self.converter.decode(pred_index.data, pred_size.data)
+        # print(pred_str)
 
         return pred_str
     
     def predict_one_call(self, image_dict: dict):
         predictions = {}
+        print(f"IMAGE DICT NUM: {len(image_dict)}")
         for key, value in image_dict.items():
             pred_str = self.predict_single(value)
             predictions[key] = {'text' : pred_str, 'bbox': []}
+        print(f"PREDICTION NUM: {len(predictions)}")
         return predictions
 
 
 if __name__ == "__main__":
-    bot = PredictBot()
-    image = cv2.imread('/home/guest/ocr_exp_v2/data/printed_text/croped_sentence/71327.png')
+    bot = CLOVAPredictBot('/home/guest/ocr_exp_v2/text_recognition_multi/ckpt/TEXT_RECOG_MULTI_BEST.pth')
+    image = cv2.imread( '/home/guest/ocr_exp_v2/data/medicine_croped/6785.png') # '/home/guest/ocr_exp_v2/data/medicine_croped/7230.png')
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     print(bot.predict_single(image))

@@ -176,8 +176,11 @@ class DetectBot(object):
     return detected_boxes
 
   def __call__(self, image_path):
-    image = cv2.imread(image_path)
-    original_image = image
+    if isinstance(image_path, str) == False:
+      image = image_path
+    else:
+      image = cv2.imread(image_path)
+    original_image = image.copy()
     org_h, org_w, org_c = original_image.shape
     if self.crop:
       croped, points = preprocess(image)

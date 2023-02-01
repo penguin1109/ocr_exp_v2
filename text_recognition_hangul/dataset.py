@@ -5,7 +5,7 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
 random.seed(42) ## randomness에 일정한 비율(?) 아무튼 random choice등을 할때에 중복된 선택 방지 및 재 구현이 가능하도록 하기 위함이다.
-from label_converter import HangulLabelConverter
+from label_converter import HangulLabelConverter, GeneralLabelConverter
 
 def load_printed_data(label_data, image_file_dict:dict):
   """ AIHUB의 한글 인쇄체 데이터셋을 사용하기 위한 함수
@@ -65,6 +65,20 @@ def load_outdoor_data(label_folder_dir, image_file_dict: dict):
 
   return croped_image, text
 
+### TODO ####
+""" Make Batch Balanced Dataset
+- Concats multiple datasets
+- However, using all the data causes a great burden, so we should train them each with a specific ratio
+"""
+class BatchBalancedDataset(object):
+  def __init__(self, dataset_list, ratio_list: list, loader_args: dict, mode='train'):
+    super(BatchBalancedDataset, self).__init__()
+    assert sum(ratio_list) == 1 and len(dataset_list) == len(ratio_list)
+
+    self.dataset_len = 0
+    self.data_loader_list = []
+    self.dataloader_iter_list = []
+
 class BaseDataset(Dataset):
   def __init__(self, mode, DATA_CFG: dict):
     super().__init__()
@@ -79,10 +93,13 @@ class BaseDataset(Dataset):
     self.img_w = DATA_CFG['IMG_W']
     self.img_h = DATA_CFG['IMG_H']
     
-    self.label_converter = HangulLabelConverter(
+    if self.data_cfg['CONVERTER'] == 'general':
+      self.label_converter = GeneralLabelConverter(max_length = self.max_length // 3)
+    else:
+      self.label_converter = HangulLabelConverter(
         base_character=''.join(self.base_characters), add_num=self.add_num, add_eng=self.add_eng,
         add_special=self.add_special, max_length=self.max_length
-    )
+      )
 
 class HENDatasetOutdoor(BaseDataset):
   def __init__(self, mode, DATA_CFG):
@@ -143,6 +160,85 @@ class HENDatasetOutdoor(BaseDataset):
 
     return tensor_image, label, text, select
 
+class HENDatasetV3(BaseDataset):
+  def __init__(self, mode, DATA_CFG):
+    super().__init__(mode, DATA_CFG)
+    self.base_dir='/home/guest/ocr_exp_v2/data/medicine_croped'
+    self.data_cfg = DATA_CFG
+    
+    image_files = os.listdir(self.base_dir)
+    image_files = [x for x in image_files if x.split('.')[-1] != 'txt']
+    label_file = os.path.join(self.base_dir, 'new_target_data.txt')
+    with open(label_file, 'r') as f:
+      self.label_data = f.readlines()
+    self._filter()
+  
+  def _shuffle(self):
+    random.shuffle(self.label_data)
+
+  def __len__(self):
+    if self.mode != 'train':
+      return 1000
+    else:
+      return int(len(self.label_data) * self.data_cfg['RATIO'])
+  
+  def _filter(self):
+    new_label = []
+    if self.add_eng == False and self.data_cfg['TARGET_ENG'] == True:
+      self.data_cfg['TARGET_ENG'] = False
+    if self.add_num == False and self.data_cfg['TARGET_NUM'] == True:
+      self.data_cfg['TARGET_NUM'] = False
+
+    for idx, label_info in enumerate(self.label_data):
+      _, text = label_info.strip('\n').split('\t')
+      if len(text) > (self.max_length // 3): ## 최장길이보다 길면 무시
+        continue
+      if self.data_cfg['TARGET_BOTH']:
+        num_found = re.findall(re.compile('[0-9]'), text)
+        eng_found = re.findall(re.compile('[a-zA-Z]'), text)
+        if len(num_found)== 0 or len(eng_found) == 0:
+          continue
+      if self.data_cfg["TARGET_NUM"]:
+        found = re.findall(re.compile('[0-9]'), text)
+        if len(found) == 0:
+          continue
+      if self.data_cfg['TARGET_ENG']:
+        found = re.findall(re.compile('[a-zA-Z]'), text)
+        if len(found) == 0:
+          continue
+
+      if self.add_num == False:
+        found = re.findall(re.compile('[0-9]'), text)
+        if len(found) != 0:
+          continue
+      if self.add_eng == False:
+        found = re.findall(re.compile('[a-zA-Z]'), text)
+        if len(found)!=0:
+          continue
+      new_label.append(label_info)
+    self.label_data = new_label
+
+  def __getitem__(self, idx):
+    label_data = self.label_data[idx]
+    image_name, text = label_data.strip('\n').split('\t')
+    image = cv2.imread(os.path.join(self.base_dir, image_name))
+    if self.data_cfg['RGB'] == False:
+      image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+      mean = self.data_cfg['GRAY_MEAN']
+      std = self.data_cfg['GRAY_STD']
+    else:
+      mean = self.data_cfg['MEAN'];std = self.data_cfg['STD']
+    
+    tensor_image = transforms.Compose([
+      transforms.ToTensor(),
+      transforms.Resize((self.img_h, self.img_w)),
+      transforms.Normalize(mean, std)
+    ])(image)
+
+    label = self.label_converter.encode(text, padding=True, one_hot=True)
+
+    return tensor_image, label, text, os.path.join(self.base_dir, image_name)
+
 class HENDatasetV2(BaseDataset):
   ## 오직 인쇄체 데이터셋만을 사용하기 위한 데이터셋
   def __init__(self, mode, DATA_CFG):
@@ -157,6 +253,9 @@ class HENDatasetV2(BaseDataset):
       self.label_data = json.load(f)['annotations']
 
     self._filter()
+  
+  def _shuffle(self):
+    random.shuffle(self.image_files)
 
   def _filter(self):
     #out_of_char = f"[^{self.label_converter.char_with_no_tokens}]"
@@ -165,6 +264,9 @@ class HENDatasetV2(BaseDataset):
     filtered_image_data = []
     for data in self.label_data:
       text = data['text']
+      if len(text) > (self.max_length // 3): ## 최장 길이보다 길면 안됨
+        continue
+
       if re.search(out_of_char, text):
         #print(text)
         continue
@@ -176,7 +278,7 @@ class HENDatasetV2(BaseDataset):
 
   def __len__(self):
     if self.mode == 'train':
-      return len(self.image_files) # int(0.5 * len(self.image_files))
+      return int(len(self.image_files) * self.data_cfg['RATIO']) # len(self.image_files) # int(0.5 * len(self.image_files))
     elif self.mode == 'debug':
       return 3000
     else:

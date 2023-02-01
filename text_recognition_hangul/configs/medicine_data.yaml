@@ -33,14 +33,14 @@ TRAIN_CFG:
 DATA_CFG:
   CONVERTER: !!str "general" # "hangul"
   TARGET_NUM: !!bool true
-  TARGET_ENG: !!bool false #  true 솔직히 영어 부분은 그렇게 중요하다곤 생각이 안들기 때문에 적어도 숫자만큼은 완벽하게 인식할 수 있게하자
+  TARGET_ENG: !!bool false # true
   TARGET_BOTH: !!bool false
   ## ADD_*얘네는 Label Converter 정의하는데 필요함
   ADD_NUM: !!bool True # False
   ADD_ENG: !!bool True # False
-  RATIO: !!float 0.7
+  RATIO: !!float 1.0
   DATASET: 
-    - 'HENDatasetV2'
+  #   - 'HENDatasetV2'
     - 'HENDatasetV3'
   USE_OUTDOOR: !!bool false
   BASE_FOLDER: '/home/guest/ocr_exp_v2/data/printed_text' ## 학습을 text_recognition 폴더 내에서 시킬 것이기 때문에 

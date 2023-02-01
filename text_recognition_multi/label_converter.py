@@ -65,7 +65,7 @@ class CTCLabelConverter(object):
                     char_list.append(self.character[t[i]])
             
             text = ''.join(char_list)
-            print(text)
+            # print(text)
 
             texts.append(text)
         return texts
