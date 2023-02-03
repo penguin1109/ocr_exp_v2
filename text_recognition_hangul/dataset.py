@@ -5,7 +5,7 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
 random.seed(42) ## randomness에 일정한 비율(?) 아무튼 random choice등을 할때에 중복된 선택 방지 및 재 구현이 가능하도록 하기 위함이다.
-from label_converter import HangulLabelConverter, GeneralLabelConverter
+from label_converter_hennet import HangulLabelConverter, GeneralLabelConverter
 
 def load_printed_data(label_data, image_file_dict:dict):
   """ AIHUB의 한글 인쇄체 데이터셋을 사용하기 위한 함수

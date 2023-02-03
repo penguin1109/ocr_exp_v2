@@ -11,7 +11,7 @@ from scheduler import CosineAnnealingWarmUpRestarts
 
 USE_CUDA=torch.cuda.is_available()
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from label_converter import HangulLabelConverter, GeneralLabelConverter
+from label_converter_hennet import HangulLabelConverter, GeneralLabelConverter
 DEVICE=torch.device('cuda:6' if USE_CUDA else 'cpu')
 
 class MYCE(nn.Module):
@@ -96,7 +96,7 @@ def train_one_epoch(model, train_dataloader, optimizer, \
 def test_one_epoch(model, test_dataloader, converter):
   loop = tqdm(test_dataloader)
   torch.set_grad_enabled(False)
-  criterion = CrossEntropyLoss(ignore_index=0)
+  criterion = CrossEntropyLoss()
   model.eval()
 
   preds = []

@@ -48,4 +48,5 @@ if __name__ == "__main__": ## 현재 동작하는 유일한 서버임을 보장
     # 단, 외부에서 접근 가능하게 하기 위해서는 run() method의 호출을 변경해서 서버의 접근은 open해야 한다.
     # app.run()
     app.debug=True
-    app.run(port=8080) # host='0.0.0.0') # port 주소를 바꿔주었더니 FLASK 앱이 실행이 되는 것을 확인할 수 있었다.
+    app.run(port=8000, host='0.0.0.0')
+    # app.run(port=5000) # host='0.0.0.0') # port 주소를 바꿔주었더니 FLASK 앱이 실행이 되는 것을 확인할 수 있었다.

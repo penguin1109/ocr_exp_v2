@@ -37,10 +37,21 @@ DETECTION_TRAINING:
     IOU_OVERLAP_THRESH_NEG: 0.3 ## 해당 anchor을 ground truth와 비교할때 neg으로 설정하는 최대 IOU값
 
 RECOGNITION_PREDICTION:
-    NAME: !!str "CLOVA" #  "HENNET"
-    CKPT: !!str '/home/guest/ocr_exp_v2/text_recognition_multi/ckpt/TEXT_RECOG_MULTI_BEST.pth'
-    IMG_H: 64 # 32
-    IMG_W: 200 # 128
+    RES_IN: !!int 32
+    ENCODER_LAYER_NUM: !!int 5
+    HEAD_NUM: !!int 8
+    TPS: !!bool false
+    ACTIVATION: !!str 'RELU'
+    USE_RESNET: !!bool true
+    ADAPTIVE_PE: !!bool false
+    BATCH_SIZE: !!int 1
+    SEPERABLE_FFN: !!bool true
+
+    CONVERTER: !!str "general" # "hangul"
+    NAME: !!str  "HENNET" # "CLOVA" # "HENNET" # "CLOVA"
+    CKPT: !!str '/home/guest/ocr_exp_v2/weight/layer5_relu_GENERAL_MULTI_NORM_0to1_ADAM_STEP_32_128/2023-02-02_min_loss.pth' # '/home/guest/ocr_exp_v2/text_recognition_multi/ckpt/TEXT_RECOG_MULTI_BEST.pth'
+    IMG_H: 32 # 64 # 32
+    IMG_W: 192 # 128 # 200 # 128
     MEAN: !!float 0.0
     STD: !!float 1.0
     USE_NUM: !!bool true

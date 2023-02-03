@@ -56,7 +56,7 @@ class Adaptive2DPositionalEncoding(nn.Module):
   def forward(self, x, batch_size):
     # x: output feature map from the Shallow CNN
     # x = [B, C, H, W]
-    B, C, H, W = x.shape
+    B, C, H, W = x.shape 
     x = rearrange(x, 'b c h w -> b w h c')
     # x = x.permute(0, 3,2,1) # [batch_size, width, height, embedding_dim]
     inter = torch.mean(x, dim = (1,2))

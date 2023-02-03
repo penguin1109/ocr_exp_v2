@@ -9,3 +9,4 @@ unzip.py
 download.py
 */__pycache__/*
 */__pycache__/*.pyc
+.ocr_exp_v2/.cpan/.cache/*

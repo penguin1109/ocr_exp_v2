@@ -15,7 +15,7 @@ sys.path.append(TEXT_DETECTION);sys.path.append(TEXT_RECOGNITION_MULTI);sys.path
 
 from text_detection.detection import DetectBot
 from text_recognition_multi.predict import CLOVAPredictBot
-# from text_recongition_hangul.predict import HENNETPredictBot
+from text_recognition_hangul.predict import HENNETPredictBot
 
 def crop_images(image, bbox):
     croped = {}
@@ -49,7 +49,9 @@ def run_ocr(
         if recognition_cfg['NAME'] == 'CLOVA':
             recog_bot = CLOVAPredictBot(recognition_model_path)
             pred_dict = recog_bot.predict_one_call(croped_dict)
-        
+        elif recognition_cfg['NAME'] == 'HENNET':
+            recog_bot = HENNETPredictBot(recognition_cfg)
+            pred_dict = recog_bot.predict_one_call(croped_dict)
         for idx, b in enumerate(box):
             pred_dict[idx]['bbox'] = b
         return pred_dict

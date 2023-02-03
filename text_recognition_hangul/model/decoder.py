@@ -49,7 +49,7 @@ class Mini_UNet(nn.Module):
   def forward(self, k):
     features = []
     inp = k
-    #print('--ENCODER--')
+    #print(f"UNET: {k.shape}")
     for i in range(0, len(self.k_encoder)):
       k = self.k_encoder[i](k)
       features.append(k)
