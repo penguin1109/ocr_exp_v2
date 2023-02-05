@@ -1,24 +1,47 @@
 MODEL_CFG:
-  PRETRAINED: ''
+  PRETRAINED: '/home/guest/ocr_exp_v2/weight/layer5_relu_1e_4_REARRANGE_SEPFFN/2023-01-29_min_loss.pth'
+  USE_RES: !!bool true # true # false
+  SEPERABLE_FFN: !!bool true # false # true #  false ## Transformer Encoder의 FFN을 Convolution을 사용할지 말지
+  PRETRAINED_OPTIM: '/home/guest/ocr_exp_v2/optim/layer5_relu_1e_4_REARRANGE_SEPFFN/2023-01-29.pth'
+  ADAPTIVE_PE: !!bool false # true
+  TPS: !!bool false
+  BATCH_SIZE: !!int 300 # 128 # 300
   RES_IN: 32
   MAX_SEQ_LENGTH: 30 #75
-  EMBEDDING_DIM:   512
-  IMG_W: 32
-  IMG_H:  128
+  ENCODER_LAYER_NUM: !!int 5 # 6 # 5 # 6 # 5 # 12 # 5 # 12 # 12 # 5 # 2 # 4
+  EMBEDDING_DIM: 512
+  FEED_FORWARD_DIM: 2048
+  HEAD_NUM: !!int 8
+  IMG_W: 192
+  IMG_H: 32 # 128
+  ACTIVATION: !!str 'RELU' # 'TANH' # 'LEAKYRELU' # 'GELU' # 'TANH' 
+  RGB: !!bool false
 
 TRAIN_CFG:
-  OPTIMIZER: 'Adam'
-  LR: !!float 1e-3
-  BATCH_SIZE: 300
+  LOSS_FN: "CE" # "FOCAL" # 'SOFTCE'
+  OPTIMIZER: 'ADAM'
+  SCHEDULER: 'COSINE' # 'CYCLIC' # 'STEP'
+  MOMENTUM: 0.9
+  LR: !!float 3e-5 # 1e-4 ## 3e-4 ## => 신기하게 ADAM은 1e-4 ~ 1e-5를 시작으로 잡는 것이, SGD는 0.1 ~ 0.01 정도를 시작 learning rate로 잡는 것이 효과적이다.
+  DEBUG: !!bool false
+  BATCH_SIZE: 300 #  128 # 300
   EPOCH: !!int 100
   EVAL_EPOCH: !!int 10
   WEIGHT_FOLDER: '/home/guest/ocr_exp_v2/weight'
-
+  OPTIM_FOLDER: '/home/guest/ocr_exp_v2/optim'
 
 DATA_CFG:
-  DATASET: 'HENDataset'
+  DATASET: 
+    - 'HENDatasetV2'
+    # - 'HENDatasetV3'
   USE_OUTDOOR: !!bool false
   BASE_FOLDER: '/home/guest/ocr_exp_v2/data/printed_text' ## 학습을 text_recognition 폴더 내에서 시킬 것이기 때문에 
+  RGB: false
+  ### MEAN, STD는 0.5로 고정으로 가는게 나을 것 같다
+  GRAY_MEAN: 0.8 # 0.0 #  0.5
+  GRAY_STD: 0.37 # 1.0 # 0.5 
+  MEAN:  [0.5,0.5,0.5] # [0.8,0.8,0.8] #  [0.0,0.0,0.0] #[0.5,0.5,0.5] 
+  STD:  [0.5,0.5,0.5] # [0.37,0.37,0.37] # [1.0,1.0,1.0] # [0.5,0.5,0.5] #
   BASE_CHARACTERS: 
     - ' ' ## 공백은 종성에 무조건 있기 때문에 꼭 포함을 시켜야 한다.
     - 'ㄱ'
@@ -77,4 +100,4 @@ DATA_CFG:
   ADD_SPECIAL: !!bool False
   MAX_LENGTH: !!int 30 # 75
   IMG_H: !!int 32
-  IMG_W: !!int 128
+  IMG_W: !!int 192 # 128

@@ -20,11 +20,13 @@ def conv3x3(in_planes, out_planes, stride=1):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
+    def __init__(self, inplanes, planes,  stride=1, downsample=None):
         super(BasicBlock, self).__init__()
         self.conv1 = conv1x1(inplanes, planes)
         self.bn1 = nn.BatchNorm2d(planes)
-        self.relu = nn.ReLU(inplace=True)
+        
+        self.relu1 =nn.ReLU(inplace=True)
+        self.relu2 = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes, stride)
         self.bn2 = nn.BatchNorm2d(planes)
         self.downsample = downsample
@@ -35,7 +37,7 @@ class BasicBlock(nn.Module):
 
         out = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.relu1(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
@@ -44,28 +46,37 @@ class BasicBlock(nn.Module):
             residual = self.downsample(x)
 
         out += residual
-        out = self.relu(out)
+        out = self.relu2(out)
 
         return out
 
 
 class ResNet(nn.Module):
 
-    def __init__(self, ch_in, block, layers):
+    def __init__(self, ch_in, block, layers, rgb):
         self.inplanes = ch_in
         super(ResNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=3, stride=1, padding=1,
+        first_ch=3 if rgb else 1
+        self.conv1 = nn.Conv2d(first_ch, self.inplanes, kernel_size=3, stride=1, padding=1,
                                bias=False)
         self.bn1 = nn.BatchNorm2d(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
-
+        """
+        if isinstance(activation, nn.ReLU):
+            self.relu = nn.ReLU(inplace=True)
+        elif isinstance(activation, nn.Tanh):
+            self.relu = nn.Tanh()
+        elif isinstance(activation, nn.GELU):
+            self.relu = nn.GELU()
+        elif isinstance(activation, nn.LeakyReLU()):
+            self.relu = nn.LeakyReLU()
+        """
+        ## Downsampling을 1번째, 3번째 layer에서만 수행한다.
         self.layer1 = self._make_layer(block, 32, layers[0], stride=2)
-       # print("MADE first")
         self.layer2 = self._make_layer(block, 64, layers[1], stride=1)
-        #print("MADE second")
         self.layer3 = self._make_layer(block,  128, layers[2], stride=2)
         self.layer4 = self._make_layer(block,  256, layers[3], stride=1)
-        self.layer5 = self._make_layer(block, 512, layers[4], stride=1)
+        self.layer5 = self._make_layer(block, 512, layers[4],  stride=1)
         
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -75,7 +86,7 @@ class ResNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def _make_layer(self, block, planes, blocks, stride=1):
+    def _make_layer(self, block, planes, blocks,stride=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
@@ -104,5 +115,5 @@ class ResNet(nn.Module):
         return x
 
 
-def resnet45(ch_in):
-    return ResNet(ch_in, BasicBlock, [3, 4, 6, 6, 3])
+def resnet45(ch_in,rgb):
+    return ResNet(ch_in, BasicBlock, [3, 4, 6, 6, 3], rgb)

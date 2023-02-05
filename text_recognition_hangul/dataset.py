@@ -5,7 +5,7 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset, DataLoader
 random.seed(42) ## randomness에 일정한 비율(?) 아무튼 random choice등을 할때에 중복된 선택 방지 및 재 구현이 가능하도록 하기 위함이다.
-from label_converter import HangulLabelConverter
+from label_converter_hennet import HangulLabelConverter, GeneralLabelConverter
 
 def load_printed_data(label_data, image_file_dict:dict):
   """ AIHUB의 한글 인쇄체 데이터셋을 사용하기 위한 함수
@@ -65,6 +65,20 @@ def load_outdoor_data(label_folder_dir, image_file_dict: dict):
 
   return croped_image, text
 
+### TODO ####
+""" Make Batch Balanced Dataset
+- Concats multiple datasets
+- However, using all the data causes a great burden, so we should train them each with a specific ratio
+"""
+class BatchBalancedDataset(object):
+  def __init__(self, dataset_list, ratio_list: list, loader_args: dict, mode='train'):
+    super(BatchBalancedDataset, self).__init__()
+    assert sum(ratio_list) == 1 and len(dataset_list) == len(ratio_list)
+
+    self.dataset_len = 0
+    self.data_loader_list = []
+    self.dataloader_iter_list = []
+
 class BaseDataset(Dataset):
   def __init__(self, mode, DATA_CFG: dict):
     super().__init__()
@@ -79,50 +93,158 @@ class BaseDataset(Dataset):
     self.img_w = DATA_CFG['IMG_W']
     self.img_h = DATA_CFG['IMG_H']
     
-    self.label_converter = HangulLabelConverter(
+    if self.data_cfg['CONVERTER'] == 'general':
+      self.label_converter = GeneralLabelConverter(max_length = self.max_length // 3)
+    else:
+      self.label_converter = HangulLabelConverter(
         base_character=''.join(self.base_characters), add_num=self.add_num, add_eng=self.add_eng,
         add_special=self.add_special, max_length=self.max_length
-    )
+      )
 
 class HENDatasetOutdoor(BaseDataset):
   def __init__(self, mode, DATA_CFG):
     super().__init__(mode, DATA_CFG)
     base_dir='/home/guest/ocr_exp_v2/data/croped_outdoor'
+    self.base_dir=base_dir
     image_files = os.listdir(base_dir)
     self.image_files = list(map(lambda x: os.path.join(base_dir, x), image_files))
     label_dir='/home/guest/ocr_exp_v2/data/croped_outdoor.json'
     with open(label_dir, 'r') as f:
       self.label_data = json.load(f)['annotations']
+    self._filter_length()
 
   def __len__(self):
     if self.mode == 'train':
       return int(len(self.image_files) * 0.5)
+    elif self.mode == 'examine':
+      return len(self.image_files)
     else:
       return 100
-    
+  
+  def _filter_length(self):
+    for i in self.label_data:
+      text = i['text']
+      label = self.label_converter.encode(text, padding=False, one_hot=False)
+      if len(label)> self.max_length:
+        #print(text)
+        # print(i['image'])
+        self.label_data.remove(i)
+        self.image_files.remove(os.path.join(self.base_dir, i['image']))
+
   def __getitem__(self, idx):
-    select = random.choice(self.image_files)
-    for label in self.label_data:
+    if self.mode == 'debug' or self.mode == 'test':
+      select = idx
+    else:
+      select = random.choice(self.image_files)
+      # print(select)
+    for label in self.label_data: ## 이미지 데이터에 맞는 라벨 데이터를 찾아줄 수 있다.
       if label['image'] == select.split('/')[-1]:
         break
     text = label['text']
 
     image = cv2.imread(select)
+    if self.data_cfg['RGB'] == False:
+      image = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+      mean, std = self.data_cfg['GRAY_MEAN'], self.data_cfg['GRAY_STD']
+    else:
+      mean, std = self.data_cfg['MEAN'], self.data_cfg['STD']
+
     image = cv2.resize(image, (self.img_w, self.img_h))
+    
     tensor_image = transforms.Compose([
       transforms.ToTensor(),
-      transforms.Normalize(mean=self.data_cfg['MEAN'], std=self.data_cfg['STD'])
+      transforms.Normalize(mean=mean, std=std)
+    ])(image)
+    
+    label = self.label_converter.encode(text, padding=True, one_hot=True)
+
+    return tensor_image, label, text, select
+
+class HENDatasetV3(BaseDataset):
+  def __init__(self, mode, DATA_CFG):
+    super().__init__(mode, DATA_CFG)
+    self.base_dir='/home/guest/ocr_exp_v2/data/medicine_croped'
+    self.data_cfg = DATA_CFG
+    
+    image_files = os.listdir(self.base_dir)
+    image_files = [x for x in image_files if x.split('.')[-1] != 'txt']
+    label_file = os.path.join(self.base_dir, 'new_target_data.txt')
+    with open(label_file, 'r') as f:
+      self.label_data = f.readlines()
+    self._filter()
+  
+  def _shuffle(self):
+    random.shuffle(self.label_data)
+
+  def __len__(self):
+    if self.mode != 'train':
+      return 1000
+    else:
+      return int(len(self.label_data) * self.data_cfg['RATIO'])
+  
+  def _filter(self):
+    new_label = []
+    if self.add_eng == False and self.data_cfg['TARGET_ENG'] == True:
+      self.data_cfg['TARGET_ENG'] = False
+    if self.add_num == False and self.data_cfg['TARGET_NUM'] == True:
+      self.data_cfg['TARGET_NUM'] = False
+
+    for idx, label_info in enumerate(self.label_data):
+      _, text = label_info.strip('\n').split('\t')
+      if len(text) > (self.max_length // 3): ## 최장길이보다 길면 무시
+        continue
+      if self.data_cfg['TARGET_BOTH']:
+        num_found = re.findall(re.compile('[0-9]'), text)
+        eng_found = re.findall(re.compile('[a-zA-Z]'), text)
+        if len(num_found)== 0 or len(eng_found) == 0:
+          continue
+      if self.data_cfg["TARGET_NUM"]:
+        found = re.findall(re.compile('[0-9]'), text)
+        if len(found) == 0:
+          continue
+      if self.data_cfg['TARGET_ENG']:
+        found = re.findall(re.compile('[a-zA-Z]'), text)
+        if len(found) == 0:
+          continue
+
+      if self.add_num == False:
+        found = re.findall(re.compile('[0-9]'), text)
+        if len(found) != 0:
+          continue
+      if self.add_eng == False:
+        found = re.findall(re.compile('[a-zA-Z]'), text)
+        if len(found)!=0:
+          continue
+      new_label.append(label_info)
+    self.label_data = new_label
+
+  def __getitem__(self, idx):
+    label_data = self.label_data[idx]
+    image_name, text = label_data.strip('\n').split('\t')
+    image = cv2.imread(os.path.join(self.base_dir, image_name))
+    if self.data_cfg['RGB'] == False:
+      image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+      mean = self.data_cfg['GRAY_MEAN']
+      std = self.data_cfg['GRAY_STD']
+    else:
+      mean = self.data_cfg['MEAN'];std = self.data_cfg['STD']
+    
+    tensor_image = transforms.Compose([
+      transforms.ToTensor(),
+      transforms.Resize((self.img_h, self.img_w)),
+      transforms.Normalize(mean, std)
     ])(image)
 
     label = self.label_converter.encode(text, padding=True, one_hot=True)
 
-    return tensor_image, label, text
+    return tensor_image, label, text, os.path.join(self.base_dir, image_name)
 
 class HENDatasetV2(BaseDataset):
   ## 오직 인쇄체 데이터셋만을 사용하기 위한 데이터셋
   def __init__(self, mode, DATA_CFG):
     super().__init__(mode, DATA_CFG)
     base_dir=DATA_CFG['BASE_FOLDER']
+    self.data_cfg = DATA_CFG
     data_files = os.listdir(os.path.join(base_dir, 'croped_sentence'))
     self.image_files = sorted([x for x in data_files if x.split('.')[-1] == 'png'])
     label_data = list(set(data_files) - set(self.image_files))[0]
@@ -131,6 +253,9 @@ class HENDatasetV2(BaseDataset):
       self.label_data = json.load(f)['annotations']
 
     self._filter()
+  
+  def _shuffle(self):
+    random.shuffle(self.image_files)
 
   def _filter(self):
     #out_of_char = f"[^{self.label_converter.char_with_no_tokens}]"
@@ -139,6 +264,9 @@ class HENDatasetV2(BaseDataset):
     filtered_image_data = []
     for data in self.label_data:
       text = data['text']
+      if len(text) > (self.max_length // 3): ## 최장 길이보다 길면 안됨
+        continue
+
       if re.search(out_of_char, text):
         #print(text)
         continue
@@ -150,21 +278,39 @@ class HENDatasetV2(BaseDataset):
 
   def __len__(self):
     if self.mode == 'train':
-      return int(0.2 * len(self.image_files))
+      return int(len(self.image_files) * self.data_cfg['RATIO']) # len(self.image_files) # int(0.5 * len(self.image_files))
+    elif self.mode == 'debug':
+      return 3000
     else:
       return 100
     
   def __getitem__(self, idx):
+
     image = cv2.imread(self.image_files[idx])
+    if self.data_cfg['RGB'] == False:
+      image = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+      mean, std = self.data_cfg['GRAY_MEAN'], self.data_cfg['GRAY_STD']
+    else:
+      mean, std = self.data_cfg['MEAN'], self.data_cfg['STD']
+
+    # image = cv2.resize(image, (self.img_w, self.img_h))
+    
     tensor_image = transforms.Compose([
       transforms.ToTensor(),
-      transforms.Resize((self.img_h, self.img_w))
+       transforms.Resize((self.img_h, self.img_w)),
+      transforms.Normalize(mean=mean, std=std)
     ])(image)
 
-    text = self.label_data[idx]['text']
-    label = self.label_converter.encode(text, padding=True, one_hot=True)
+    for label_data in self.label_data:
+      if label_data['image'] == self.image_files[idx]:
+        break
 
-    return tensor_image, label, text
+
+    text = label_data['text']
+    label = self.label_converter.encode(text, padding=True, one_hot=True)
+    # label = label.type(torch.LongTensor)
+
+    return tensor_image, label, text , self.image_files[idx]
 
 
 
@@ -189,7 +335,7 @@ class HENDataset(BaseDataset):
     if self.mode == 'train':
       items = self.image_file_dict.values()
       n = sum(list(map(lambda x: len(x), items)))
-      return int(n * 0.1)
+      return n
     else:
       return 100 ## Testing이나 Evaluate할 때는 한번에 하나씩 사용하기 때문에 -> 즉, batch=1으로 inference를 하게 될 것이라는 뜻이다.
   
@@ -243,25 +389,3 @@ class HENDataset(BaseDataset):
           image_file_dict[dtype] = list(map(lambda x: os.path.join(new_dir, x), sorted(os.listdir(new_dir))))
     self.image_file_dict = image_file_dict
 
-if __name__ == "__main__":
-  import yaml
-  import numpy as np
-  from torch.utils.data import DataLoader
-  with open('/home/guest/ocr_exp_v2/text_recognition_hangul/configs/outdoor_data.yaml', 'r') as f:
-    cfg = yaml.load(f, Loader=yaml.FullLoader)
-  dataset = HENDatasetOutdoor(mode='train', DATA_CFG=cfg['DATA_CFG'])
-  print(len(dataset))
-  # print(dataset.label_converter.char_with_no_tokens)
-  loader = DataLoader(dataset, batch_size=300)
-  for idx, batch in enumerate(loader):
-    image, label, text = batch
-    print(' '.join(text))
-    for b in range(image.shape[0]):
-      #print(image[b].shape)
-      #print(np.unique(np.array(image[b].detach().cpu().numpy())))
-      
-      cv2.imwrite(f"{b}.png", image[b].detach().permute(1,2 ,0).cpu().numpy()*255)
-    for c in range(3):
-      print(image[:,c,:,:].mean())
-      print(image[:, c,:,:].std())
-    break

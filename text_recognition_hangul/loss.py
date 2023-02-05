@@ -11,16 +11,20 @@ def to_contiguous(tensor):
 class FocalLoss(nn.Module):
   ## grapheme의 클래스 불균형 문제를 해소하기 위해서 사용하는 loss function이다.
   ## 더 예측 prob score이 항상 높은, 즉 발현 빈도수가 높은 class에 대한 중요도를 낮춰주도록 한다.
-  def __init__(self, max_length=75, alpha=0.99, gamma=1, use_focal=False,
+  def __init__(self, max_length=75, alpha=0.99, gamma=2,
                size_average=True, sequence_normalize=False, sample_normalize=True):
+    """ Focal Loss: focus less on easy examples and more on hard examples
+    FL(p_t) = -alpha * (1-p_t)^gamma * log(p_t)
+    CE(p_t) = -log(p_t)
+    """
     super(FocalLoss, self).__init__()
     self.alpha = alpha
     self.ignore_index=0
     self.gamma = gamma
-    self.use_focal = use_focal
     self.size_average = size_average
     self.sequence_normalize = sequence_normalize
     self.sample_normalize = sample_normalize
+  
 
   def forward(self, prediction, ground_truth, length):
     batch_size, max_length = prediction.size(0), prediction.size(1)
@@ -28,7 +32,7 @@ class FocalLoss(nn.Module):
     
     mask = torch.zeros(batch_size, max_length)
     for i in range(batch_size):
-      mask[i, :length[i]].fill_(1)
+      mask[i, :length[i]].fill_(1) ## 실제 정답인 것에 대해서 length를 구해 준다.
     mask = mask.type_as(prediction)[:, :max_length]
     
     prediction = to_contiguous(prediction).view(-1, prediction.size(2))
@@ -56,8 +60,19 @@ class FocalLoss(nn.Module):
         loss = loss / batch_size
     
     return loss
-    
 
+
+
+"""
+  def forward(self, prediction, ground_truth):
+    assert prediction.shape == ground_truth.shape
+    batch_size, max_length, class_n = prediction.shape
+    logpt = F.log_softmax(prediction, dim=1)
+    pt = torch.exp(logpt)
+    logpt = (1-pt) ** self.gamma * logpt
+    loss = F.nll_loss(logpt, prediction)
+    return loss 
+"""
 
 class SoftCrossEntropyLoss(nn.Module):
   def __init__(self, reduction="mean"):
