@@ -5,8 +5,8 @@ import os, sys
 from einops import rearrange
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# from attention import MultiHeadAttention
-from multi_head_attention import MultiheadAttention
+from attention import MultiHeadAttention as MultiheadAttention
+# from multi_head_attention import MultiheadAttention
 ### Depth Wise Convolution
 class DepthWiseConv(nn.Module):
   def __init__(self, nin, kernels_per_layer=1):

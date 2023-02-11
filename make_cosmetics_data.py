@@ -20,7 +20,7 @@ def extract_info(json_data: dict,max_n):
     bbox.append({'points': [minX, minY, maxX, maxY], 'text': text})
   return bbox
 
-def crop_medicine_data(image, json_data: dict, max_n):
+def crop_cosmetic_data(image, json_data: dict, max_n):
   bbox = extract_info(json_data, max_n)
   # draw_image = image.copy()
   text = []
@@ -46,18 +46,18 @@ def crop_medicine_data(image, json_data: dict, max_n):
 idx = 0
 from tqdm import tqdm
 import cv2, os, json
-MEDICINE_FOLDER='/home/guest/ocr_exp_v2/data/medicine'
+COSMETICS_FOLDER='/home/guest/ocr_exp_v2/data/cosmetics'
 
-IMAGE=os.path.join(MEDICINE_FOLDER, 'images')
-TARGET=os.path.join(MEDICINE_FOLDER, 'annotations')
+IMAGE=os.path.join(COSMETICS_FOLDER, 'images/cosmetics/images')
+TARGET=os.path.join(COSMETICS_FOLDER, 'annotations/annotations')
 
-MEDICINE_IMAGE_DIR=sorted(os.listdir(IMAGE))
-MEDICINE_TARGET_DIR=sorted(os.listdir(TARGET))
+COSMETICS_IMAGE_DIR=sorted(os.listdir(IMAGE))
+COSMETICS_TARGET_DIR=sorted(os.listdir(TARGET))
 
-MEDICINE_DEST='/home/guest/ocr_exp_v2/data/medicine_croped'
-os.makedirs(MEDICINE_DEST, exist_ok=True)
-with open(os.path.join(MEDICINE_DEST, 'new_target_data.txt'), 'w') as ftext:
-  loop = tqdm(zip(MEDICINE_IMAGE_DIR, MEDICINE_TARGET_DIR))
+COSMETICS_DEST='/home/guest/ocr_exp_v2/data/cosmetics_croped'
+os.makedirs(COSMETICS_DEST, exist_ok=True)
+with open(os.path.join(COSMETICS_DEST, 'new_target_data.txt'), 'w') as ftext:
+  loop = tqdm(zip(COSMETICS_IMAGE_DIR, COSMETICS_TARGET_DIR))
   for image_dir, target_dir in loop:
     if (image_dir.split('.')[0] != target_dir.split('.')[0]):
       print(image_dir, target_dir)
@@ -65,11 +65,11 @@ with open(os.path.join(MEDICINE_DEST, 'new_target_data.txt'), 'w') as ftext:
     image = cv2.imread(os.path.join(IMAGE, image_dir))
     with open(os.path.join(TARGET, target_dir), 'r') as f:
       json_data = json.load(f)
-    text, points = crop_medicine_data(image, json_data, max_n=5)
+    text, points = crop_cosmetic_data(image, json_data, max_n=5)
     for t, p in zip(text, points):
       try:
         croped = image[p[1]:p[3], p[0]:p[2]]
-        cv2.imwrite(os.path.join(MEDICINE_DEST, f"{idx}.png"), croped)
+        cv2.imwrite(os.path.join(COSMETICS_DEST, f"{idx}.png"), croped)
         ftext.write(f"{idx}.png\t{t}\n")
         loop.set_postfix({"IDX": idx, "TEXT": t})
         idx += 1

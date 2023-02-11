@@ -9,8 +9,8 @@ from mha_formula import multi_head_attention_forward
 class MultiHeadAttention(nn.Module):
   def __init__(self,
                embed_dim,
-               head_num,
-               dropout_rate=0.0, kdim=None, vdim=None, bias=True, add_bias_kv=False, add_zero_attn=False):
+               num_heads,
+               dropout=0.0, kdim=None, vdim=None, bias=True, add_bias_kv=False, add_zero_attn=False):
     super(MultiHeadAttention, self).__init__()
     self.embed_dim = embed_dim
     self.kdim = embed_dim if kdim is None else kdim
@@ -18,10 +18,10 @@ class MultiHeadAttention(nn.Module):
 
     self._qkv_same_embed_dim = self.kdim == embed_dim and self.vdim == embed_dim
 
-    self.head_num = head_num
-    self.dropout = dropout_rate
-    self.head_dim = embed_dim // head_num
-    assert self.head_dim * head_num == self.embed_dim, "embedding dimension must be divisble by number of heads"
+    self.head_num = num_heads
+    self.dropout = dropout
+    self.head_dim = embed_dim // num_heads
+    assert self.head_dim * num_heads == self.embed_dim, "embedding dimension must be divisble by number of heads"
     
     if self._qkv_same_embed_dim is False:
       self.q_proj_weight = nn.Parameter(torch.Tensor(embed_dim, embed_dim))

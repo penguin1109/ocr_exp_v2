@@ -3,12 +3,13 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, ConcatDataset
 from jamo_utils import jamo_merge, jamo_split
-from label_converter import HangulLabelConverter, GeneralLabelConverter
+from label_converter_hennet import HangulLabelConverter, GeneralLabelConverter
 import yaml, os, json
 
-YAML_DIR='/home/guest/ocr_exp_v2/text_recognition_hangul/configs'
-YAML_NAME='medicine_data.yaml'
-# YAML_NAME='multi_data.yaml'
+
+YAML_DIR='/home/guest/speaking_fridgey/ocr_exp_v2/text_recognition_hangul/configs'
+# YAML_NAME='medicine_data.yaml'
+YAML_NAME='multi_data_hangul.yaml'
 # YAML_NAME='printed_data.yaml'
 # YAML_NAME='outdoor_data.yaml'
 with open(os.path.join(YAML_DIR, YAML_NAME), 'r') as f:
@@ -24,8 +25,8 @@ data_cfg = CONFIG['DATA_CFG']
 #     META_DATA=json.load(f)['annotations']
 
 # print(META_DATA[0:len(META_DATA):10])
-CONVERTER = GeneralLabelConverter(max_length = data_cfg['MAX_LENGTH'] // 3)
-# CONVERTER = HangulLabelConverter(add_num=True, add_eng=True, add_special=False, max_length=45)
+# CONVERTER = GeneralLabelConverter(max_length = data_cfg['MAX_LENGTH'] // 3)
+CONVERTER = HangulLabelConverter(add_num=True, add_eng=True, add_special=False, max_length=75)
 # print(CONVERTER.characters) ## null, 중성 없음, 자-모음, unknown
 
 pred = CONVERTER.encode('아니양 같아',) #  one_hot=False)
@@ -36,13 +37,13 @@ print(CONVERTER.char_encoder_dict)
 #print(pred)
 # print(jamo_merge.join_jamo_char('ㅇ', 'ㅏ', ' '))
 if 'outdoor' in YAML_NAME:
-    dataset = HENDatasetOutdoor(mode='train', DATA_CFG=data_cfg)
+    dataset = HENDatasetOutdoor(mode='train', DATA_CFG=data_cfg, raio=1.0)
 elif 'printed' in YAML_NAME:
-    dataset = HENDatasetV2(mode='train',DATA_CFG=data_cfg)
+    dataset = HENDatasetV2(mode='train',DATA_CFG=data_cfg, ratio=1.0)
 elif 'multi' in YAML_NAME:
     datasets = []
-    datasets.append(HENDatasetV3(mode='train', DATA_CFG=data_cfg))
-    datasets.append(HENDatasetV2(mode='train', DATA_CFG=data_cfg))
+    datasets.append(HENDatasetV3(mode='train', DATA_CFG=data_cfg, ratio=1.0, base_dir='/home/guest/speaking_fridgey/ocr_exp_v2/data/medicine_croped'))
+    datasets.append(HENDatasetV3(mode='train', DATA_CFG=data_cfg, ratio=1.0,base_dir='/home/guest/speaking_fridgey/ocr_exp_v2/data/cosmetics_croped'))
     dataset = ConcatDataset(datasets)
 elif 'medicine' in YAML_NAME:
     dataset = HENDatasetV3(mode='train', DATA_CFG=data_cfg)

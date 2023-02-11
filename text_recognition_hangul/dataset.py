@@ -3,6 +3,7 @@ import random, os, json, cv2, re
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
+from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 random.seed(42) ## randomness에 일정한 비율(?) 아무튼 random choice등을 할때에 중복된 선택 방지 및 재 구현이 가능하도록 하기 위함이다.
 from label_converter_hennet import HangulLabelConverter, GeneralLabelConverter
@@ -102,20 +103,21 @@ class BaseDataset(Dataset):
       )
 
 class HENDatasetOutdoor(BaseDataset):
-  def __init__(self, mode, DATA_CFG):
+  def __init__(self, mode, DATA_CFG, ratio):
     super().__init__(mode, DATA_CFG)
     base_dir='/home/guest/ocr_exp_v2/data/croped_outdoor'
     self.base_dir=base_dir
+    self.ratio = ratio
     image_files = os.listdir(base_dir)
     self.image_files = list(map(lambda x: os.path.join(base_dir, x), image_files))
-    label_dir='/home/guest/ocr_exp_v2/data/croped_outdoor.json'
+    label_dir='/home/guest/speaking_fridgey/ocr_exp_v2/data/croped_outdoor.json'
     with open(label_dir, 'r') as f:
       self.label_data = json.load(f)['annotations']
     self._filter_length()
 
   def __len__(self):
     if self.mode == 'train':
-      return int(len(self.image_files) * 0.5)
+      return int(len(self.image_files) * self.ratio)
     elif self.mode == 'examine':
       return len(self.image_files)
     else:
@@ -161,14 +163,16 @@ class HENDatasetOutdoor(BaseDataset):
     return tensor_image, label, text, select
 
 class HENDatasetV3(BaseDataset):
-  def __init__(self, mode, DATA_CFG):
+  def __init__(self, mode, DATA_CFG, ratio, base_dir):
     super().__init__(mode, DATA_CFG)
-    self.base_dir='/home/guest/ocr_exp_v2/data/medicine_croped'
+    self.base_dir=base_dir # '/home/guest/ocr_exp_v2/data/medicine_croped'
     self.data_cfg = DATA_CFG
+    self.ratio = ratio
     
     image_files = os.listdir(self.base_dir)
     image_files = [x for x in image_files if x.split('.')[-1] != 'txt']
     label_file = os.path.join(self.base_dir, 'new_target_data.txt')
+    self.image_files = image_files
     with open(label_file, 'r') as f:
       self.label_data = f.readlines()
     self._filter()
@@ -180,19 +184,34 @@ class HENDatasetV3(BaseDataset):
     if self.mode != 'train':
       return 1000
     else:
-      return int(len(self.label_data) * self.data_cfg['RATIO'])
+      return int(len(self.label_data) * self.ratio)
   
   def _filter(self):
     new_label = []
+    if len(self.image_files) < len(self.label_data):
+      self.label_data = self.label_data[:len(self.image_files)]
+
     if self.add_eng == False and self.data_cfg['TARGET_ENG'] == True:
       self.data_cfg['TARGET_ENG'] = False
     if self.add_num == False and self.data_cfg['TARGET_NUM'] == True:
       self.data_cfg['TARGET_NUM'] = False
 
+    # loop = tqdm(self.label_data)
     for idx, label_info in enumerate(self.label_data):
-      _, text = label_info.strip('\n').split('\t')
-      if len(text) > (self.max_length // 3): ## 최장길이보다 길면 무시
-        continue
+      image_name, text = label_info.strip('\n').split('\t')
+     # image = cv2.imread(os.path.join(self.base_dir, image_name))
+      # H, W, C = image.shape
+      # if (H > W): ## 세로가 가로에 비해서 길면 미리 
+        # loop.set_postfix({"DIFFERNT RATIO" : image_name})
+        # print(os.path.join(self.base_dir, image_name))
+        # continue
+      if self.data_cfg['CONVERTER'] == 'HANGUL':
+        if len(text) > self.max_length // 3:
+          continue
+      else:
+        if len(text) > self.max_length:
+          continue
+
       if self.data_cfg['TARGET_BOTH']:
         num_found = re.findall(re.compile('[0-9]'), text)
         eng_found = re.findall(re.compile('[a-zA-Z]'), text)
@@ -219,6 +238,7 @@ class HENDatasetV3(BaseDataset):
     self.label_data = new_label
 
   def __getitem__(self, idx):
+    idx = random.choice([int(i) for i in range(len(self.label_data))])
     label_data = self.label_data[idx]
     image_name, text = label_data.strip('\n').split('\t')
     image = cv2.imread(os.path.join(self.base_dir, image_name))
@@ -241,10 +261,11 @@ class HENDatasetV3(BaseDataset):
 
 class HENDatasetV2(BaseDataset):
   ## 오직 인쇄체 데이터셋만을 사용하기 위한 데이터셋
-  def __init__(self, mode, DATA_CFG):
+  def __init__(self, mode, DATA_CFG, ratio):
     super().__init__(mode, DATA_CFG)
     base_dir=DATA_CFG['BASE_FOLDER']
     self.data_cfg = DATA_CFG
+    self.ratio = ratio
     data_files = os.listdir(os.path.join(base_dir, 'croped_sentence'))
     self.image_files = sorted([x for x in data_files if x.split('.')[-1] == 'png'])
     label_data = list(set(data_files) - set(self.image_files))[0]
@@ -264,8 +285,12 @@ class HENDatasetV2(BaseDataset):
     filtered_image_data = []
     for data in self.label_data:
       text = data['text']
-      if len(text) > (self.max_length // 3): ## 최장 길이보다 길면 안됨
-        continue
+      if self.data_cfg['CONVERTER'] == 'HANGUL':
+        if len(text) > self.max_length // 3:
+          continue
+      else:
+        if len(text) > self.max_length:
+          continue
 
       if re.search(out_of_char, text):
         #print(text)
@@ -278,14 +303,14 @@ class HENDatasetV2(BaseDataset):
 
   def __len__(self):
     if self.mode == 'train':
-      return int(len(self.image_files) * self.data_cfg['RATIO']) # len(self.image_files) # int(0.5 * len(self.image_files))
+      return int(len(self.image_files) * self.ratio) # len(self.image_files) # int(0.5 * len(self.image_files))
     elif self.mode == 'debug':
       return 3000
     else:
       return 100
     
   def __getitem__(self, idx):
-
+    idx = random.choice([int(i) for i in range(len(self.image_files))])
     image = cv2.imread(self.image_files[idx])
     if self.data_cfg['RGB'] == False:
       image = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)

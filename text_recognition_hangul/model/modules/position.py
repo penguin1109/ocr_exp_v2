@@ -41,14 +41,28 @@ class Adaptive2DPositionalEncoding(nn.Module):
   def __init__(self, embedding_dim, width, height, batch_size, device=DEVICE):
     super(Adaptive2DPositionalEncoding, self).__init__()
     self.inter_fc = nn.Sequential(
-        nn.Linear(embedding_dim, embedding_dim//2, bias=False), nn.Tanh(), nn.Linear(embedding_dim//2, embedding_dim*2, bias=False), nn.Sigmoid()
+        nn.Linear(embedding_dim, embedding_dim//2, bias=False), nn.ReLU(), nn.Linear(embedding_dim//2, 2* embedding_dim, bias=False), nn.Sigmoid()
     )
-    pe_width = get_position_encoding(width, embedding_dim, device)
-    pe_height = get_position_encoding(height, embedding_dim, device)
+    pe = torch.zeros(width, embedding_dim, device=device)
+    pe.requires_grad=False
+    pos = torch.arange(width)
+    pos = pos.float().unsqueeze(dim=1)
+    pe[:, 0::2] = torch.sin(pos / (10000 ** (torch.arange(0, embedding_dim, 2)/embedding_dim)))
+    pe[:, 1::2] = torch.sin(pos / (10000 ** (torch.arange(0, embedding_dim, 2)/embedding_dim)))
+    pe_width = pe
+    pe = torch.zeros(height, embedding_dim, device=device)
+    pe.requires_grad=False
+    pos = torch.arange(height)
+    pos = pos.float().unsqueeze(dim=1)
+    pe[:, 0::2] = torch.sin(pos / (10000 ** (torch.arange(0,embedding_dim, 2)/embedding_dim)))
+    pe[:, 1::2] = torch.sin(pos / (10000 ** (torch.arange(0, embedding_dim, 2)/embedding_dim)))
+    pe_height = pe
+    #pe_width = get_position_encoding(width, embedding_dim, device)
+    #pe_height = get_position_encoding(height, embedding_dim, device)
     pe_width = torch.unsqueeze(pe_width, dim=1)
     pe_height = torch.unsqueeze(pe_height, dim=0)
-    pe_width = torch.tile(torch.unsqueeze(pe_width, dim=0), [batch_size, 1, 1, 1])
-    pe_height = torch.tile(torch.unsqueeze(pe_height, dim=0), [batch_size, 1, 1, 1])
+    pe_width = torch.tile(torch.unsqueeze(pe_width, dim=0), [1, 1, 1])
+    pe_height = torch.tile(torch.unsqueeze(pe_height, dim=0), [1, 1, 1])
 
     self.register_buffer('pe_width', pe_width)
     self.register_buffer('pe_height', pe_height)
@@ -56,27 +70,27 @@ class Adaptive2DPositionalEncoding(nn.Module):
   def forward(self, x, batch_size):
     # x: output feature map from the Shallow CNN
     # x = [B, C, H, W]
-    B, C, H, W = x.shape 
+    B, C, H, W = x.shape
     x = rearrange(x, 'b c h w -> b w h c')
-    # x = x.permute(0, 3,2,1) # [batch_size, width, height, embedding_dim]
+    # x = x.permute(0, 3,2,1).contiguous() # [batch_size, width, height, embedding_dim]
     inter = torch.mean(x, dim = (1,2))
     alpha = self.inter_fc(inter)
-    n,c=alpha.shape
-    alpha = rearrange(alpha, 'n (a b k) -> n a b k', k=C, a=2,b=1)
-
-    # alpha = alpha.view(-1, 2, 1, C).contiguous()
-    alpha = alpha[:batch_size, :, :, :]
-    self.pe_width = self.pe_width[:batch_size, :, :, :]
-    self.pe_height = self.pe_height[:batch_size, :, :, :]
+    n, c = alpha.shape
+    alpha = rearrange(alpha, 'n (a b k) -> n a b k', k=C, n=n,a=2, b=1)
+    #alpha = alpha.view(-1, 2, 1, C).contiguous()
+    
     pos_encoding = alpha[:, 0:1, :, :] * self.pe_height + alpha[:, 1:2, :, :] * self.pe_width
     
-    x += pos_encoding
-    B, W, H, E = x.shape
+    x = x + pos_encoding # x += pos_encoding -> 이렇게 더해주니 inplace error이 backward pass를 할 때 발생하였다.
+    B,W, H, E = x.shape
     feature = rearrange(x, 'b w h d -> b d (h w)')
-    feature = rearrange(feature, 'b d s -> s b d', d=E, b=B) ## permute 대신에 사용
+  
+    feature = rearrange(feature, 'b d s -> s b d', d=E, b=B)
+    # feature = x.contiguous().view(B, E, -1).permute(2, 0, 1).contiguous()
     # feature = x.contiguous().view(B, E, -1).permute(2, 0, 1)
 
     return x, feature
+
 
 class PositionEncoding(nn.Module):
   def __init__(self, 
