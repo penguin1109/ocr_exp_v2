@@ -175,7 +175,7 @@ from loguru import logger
 import datetime
 TODAY=datetime.datetime.now()
 TODAY=TODAY.strftime('%Y-%m-%d')
-CONFIG_DIR='/home/guest/ocr_exp_v2/text_recognition_hangul/configs'
+CONFIG_DIR='/home/guest/speaking_fridgey/ocr_exp_v2/text_recognition_hangul/configs'
 from dataset import HENDataset, HENDatasetV2, HENDatasetOutdoor, HENDatasetV3
 from model.hen_net import HENNet
 
@@ -198,27 +198,34 @@ if __name__ == "__main__":
   os.makedirs(os.path.join(train_cfg['WEIGHT_FOLDER'], exp_name), exist_ok=True)
   os.makedirs(os.path.join(train_cfg['OPTIM_FOLDER'], exp_name), exist_ok=True)
 
+  ratio = data_cfg['RATIO']
+  # assert (sum(ratio)== 1 and len(ratio) == len(data_cfg['DATASET']))
   use_datasets = []
-  if 'HENDatasetOutdoor' in data_cfg['DATASET']:
-    train_dataset = HENDatasetOutdoor(mode='train', DATA_CFG=data_cfg)
-    use_datasets.append(train_dataset)
+  for idx, i in enumerate(data_cfg['DATASET']):
+    if 'HENDatasetOutdoor'  == i:
+      train_dataset = HENDatasetOutdoor(mode='train', DATA_CFG=data_cfg, ratio = ratio[idx])
+      use_datasets.append(train_dataset)
 
-  if 'HENDatasetV2' in data_cfg['DATASET']:
-    train_dataset = HENDatasetV2(mode='train', DATA_CFG=data_cfg)
-    use_datasets.append(train_dataset)
+    if 'HENDatasetV2'  == i:
+      train_dataset = HENDatasetV2(mode='train', DATA_CFG=data_cfg, ratio=ratio[idx])
+      use_datasets.append(train_dataset)
     
-  if 'HENDatasetV3' in data_cfg['DATASET']:
-    train_dataset = HENDatasetV3(mode='train', DATA_CFG=data_cfg)
-    use_datasets.append(train_dataset)
+    if 'HENDatasetV3' == i:
+      if data_cfg['USE_MEDICINE']:
+        train_dataset = HENDatasetV3(mode='train', DATA_CFG=data_cfg, ratio = ratio[idx], base_dir='/home/guest/speaking_fridgey/ocr_exp_v2/data/medicine_croped')
+        use_datasets.append(train_dataset)
+      if data_cfg['USE_COSMETICS']:
+        train_dataset = HENDatasetV3(mode='train', DATA_CFG=data_cfg, ratio=ratio[idx], base_dir='/home/guest/speaking_fridgey/ocr_exp_v2/data/cosmetics_croped')
+        use_datasets.append(train_dataset)
 
   ## MAKE THE CONCATENATED DATASET ##
   train_dataset = ConcatDataset(use_datasets) 
   if 'V3' in data_cfg['DATASET']:
-    test_dataset = HENDatasetV3(mode='test', DATA_CFG=data_cfg) ## TEST WITH DATA WITH V2 or V3
+    test_dataset = HENDatasetV3(mode='test', DATA_CFG=data_cfg, ratio=1.0) ## TEST WITH DATA WITH V2 or V3
   else:
-    test_dataset = HENDatasetV2(mode= 'test', DATA_CFG=data_cfg)
+    test_dataset = HENDatasetV2(mode= 'test', DATA_CFG=data_cfg, ratio=1.0)
 
-  debug_dataset = HENDatasetV2(mode='debug', DATA_CFG=data_cfg)
+  debug_dataset = HENDatasetV2(mode='debug', DATA_CFG=data_cfg, ratio=1.0)
 
   train_loader = DataLoader(train_dataset, batch_size=train_cfg['BATCH_SIZE'], shuffle=True, drop_last=True)
   test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
@@ -274,7 +281,8 @@ if __name__ == "__main__":
           step_size_up=2500, step_size_down=None, mode='triangular2', \
           cycle_momentum=cycle_momentum)
   elif train_cfg['SCHEDULER'] == 'STEP':
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=40
+  , gamma=0.5)
   
   elif train_cfg['SCHEDULER'] == 'COSINE':
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=100, eta_min=0)

@@ -69,11 +69,9 @@ class HENNet(nn.Module):
     return pred
 
 if __name__ == "__main__":
-  net = HENNet(img_w=192, img_h=32, res_in=32, max_seq_length=30,\
-   embedding_dim=512, class_n=54, encoder_layer_num=2, use_resnet=False, \
-   head_num=8, activation = 'tanh', \
-   adaptive_pe=True, batch_size=2, rgb=False).to(DEVICE)
+  net = HENNet(img_w=192, img_h=32, res_in=64, head_num=8, encoder_layer_num=5, tps=False,
+              activation='RELU', use_resnet=True, adaptive_pe=True, batch_size=1,seperable_ffn=True, rgb=False).to(DEVICE)
   sample = torch.rand((2, 1, 32,192)).to(DEVICE)
 
-  out = net(sample, mode='train', batch_size=30)
+  out = net(sample, mode='train', batch_size=1)
   print(out.shape) ## (Batch Size, Max Sequence Length, Class Number)

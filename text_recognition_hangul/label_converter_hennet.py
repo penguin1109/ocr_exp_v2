@@ -40,7 +40,17 @@ class GeneralLabelConverter(object):
                 null_char=u'\u2227',
                 unknown_char=u'\u2567'
                 ):
-    self.characters = null_char + base_character + unknown_char
+    self.ko_dict='/home/guest/ocr_exp_v2/text_recognition_hangul/ko_dict.txt'
+    with open(self.ko_dict, 'r') as f:
+      text = f.readlines()
+    text = [t.strip() for t in text]
+    base_text = [t for t in base_character]
+
+    text = list(set(text) | set(base_text))
+    
+    self.base_character = ''.join(text)
+    self.base_character = ' '+ self.base_character
+    self.characters = null_char + self.base_character + unknown_char
     self.char_encoder_dict = {}
     self.char_decoder_dict = {}
     self.max_length = max_length
@@ -66,6 +76,7 @@ class GeneralLabelConverter(object):
     for tok in text:
       if tok not in self.char_encoder_dict: ## 그냥 모르는애면 UNK label로 설정한다. -> 하지만 차라리 그 다음에 있는 라벨로 설정한다면?
         chars = split_syllable_char(tok)
+        
         HANGULS=' ㄱㄲㄳㄴㄵㄶㄷㄸㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅃㅄㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
 
         new_tok = ''

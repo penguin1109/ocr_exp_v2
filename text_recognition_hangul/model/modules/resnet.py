@@ -25,8 +25,8 @@ class BasicBlock(nn.Module):
         self.conv1 = conv1x1(inplanes, planes)
         self.bn1 = nn.BatchNorm2d(planes)
         
-        self.relu1 =nn.ReLU(inplace=True)
-        self.relu2 = nn.ReLU(inplace=True)
+        self.relu1 =nn.ReLU()
+        self.relu2 = nn.ReLU()
         self.conv2 = conv3x3(planes, planes, stride)
         self.bn2 = nn.BatchNorm2d(planes)
         self.downsample = downsample

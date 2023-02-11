@@ -1,9 +1,9 @@
 MODEL_CFG:
-  PRETRAINED: '' # '/home/guest/ocr_exp_v2/weight/layer5_relu_general/2023-02-09.pth' # '/home/guest/ocr_exp_v2/weight/layer5_relu_MULTI_NORM_0to1_ADAM_STEP/2023-01-31_min_loss.pth'
+  PRETRAINED: '' # '/home/guest/ocr_exp_v2/weight/layer5_relu_MULTI_NORM_0to1_ADAM_STEP/2023-01-31_min_loss.pth'
   USE_RES: !!bool true # true # false
-  SEPERABLE_FFN: !!bool true # false # true # false # true #  false ## Transformer Encoder의 FFN을 Convolution을 사용할지 말지
-  PRETRAINED_OPTIM: '' # '/home/guest/ocr_exp_v2/optim/layer5_relu_general/2023-02-09.pth' # '/home/guest/ocr_exp_v2/optim/layer5_relu_MULTI_NORM_0to1_ADAM_STEP/2023-01-31.pth'
-  ADAPTIVE_PE: !!bool false # true # false # true
+  SEPERABLE_FFN: !!bool true # true # false # true #  false ## Transformer Encoder의 FFN을 Convolution을 사용할지 말지
+  PRETRAINED_OPTIM: '' # '/home/guest/ocr_exp_v2/optim/layer5_relu_MULTI_NORM_0to1_ADAM_STEP/2023-01-31.pth'
+  ADAPTIVE_PE: !!bool false #  true # false # true # false # true
   TPS: !!bool false # true
   BATCH_SIZE: !!int 300 # 128 # 300
   RES_IN: 32
@@ -15,14 +15,14 @@ MODEL_CFG:
   IMG_W: 192 # 128 # 192
   IMG_H: 32 # 128
   ACTIVATION: !!str 'RELU' # 'TANH' # 'LEAKYRELU' # 'GELU' # 'TANH' 
-  RGB: !!bool false
+  RGB: !!bool true # false
 
 TRAIN_CFG:
   LOSS_FN: "CE" # "FOCAL" # 'SOFTCE'
   OPTIMIZER: 'ADAM' # 'SGD' # 'ADAM'
   SCHEDULER: 'STEP' # 'COSINE' # 'CYCLIC' # 
   MOMENTUM: 0.9
-  LR: !!float 3e-4 # 2e-4 # 1e-4 # 1e-4 ## 3e-4 ## => 신기하게 ADAM은 1e-4 ~ 1e-5를 시작으로 잡는 것이, SGD는 0.1 ~ 0.01 정도를 시작 learning rate로 잡는 것이 효과적이다.
+  LR: !!float 3e-4 # 1e-4 # 1e-4 ## 3e-4 ## => 신기하게 ADAM은 1e-4 ~ 1e-5를 시작으로 잡는 것이, SGD는 0.1 ~ 0.01 정도를 시작 learning rate로 잡는 것이 효과적이다.
   DEBUG: !!bool false
   BATCH_SIZE: 300 #  128 # 300
   EPOCH: !!int 100
@@ -31,27 +31,27 @@ TRAIN_CFG:
   OPTIM_FOLDER: '/home/guest/speaking_fridgey/ocr_exp_v2/optim'
 
 DATA_CFG:
+  RGB: !!bool true
   USE_COSMETICS: !!bool true
   USE_MEDICINE: !!bool true
   IMG_H: !!int 32
   IMG_W: !!int 192 # 128 # 192 # 128
   MAX_LENGTH: !!int 75
-  CONVERTER: !!str "general" # "hangul"
-  TARGET_NUM: !!bool false # true
+  CONVERTER: !!str "hangul" # "general" # "hangul"
+  TARGET_NUM: !!bool false # true # true
   TARGET_ENG: !!bool false #  true 솔직히 영어 부분은 그렇게 중요하다곤 생각이 안들기 때문에 적어도 숫자만큼은 완벽하게 인식할 수 있게하자
   TARGET_BOTH: !!bool false
   ## ADD_*얘네는 Label Converter 정의하는데 필요함
-  ADD_NUM: !!bool True # False
-  ADD_ENG: !!bool True # False
+  ADD_NUM: !!bool true # false # True # False
+  ADD_ENG: !!bool true # false # True # False
   RATIO: 
     - 0.2
     - 0.2
   DATASET: 
-    - 'HENDatasetV2'
+    # - 'HENDatasetV2'
     - 'HENDatasetV3'
   USE_OUTDOOR: !!bool false
   BASE_FOLDER: '/home/guest/speaking_fridgey/ocr_exp_v2/data/printed_text' ## 학습을 text_recognition 폴더 내에서 시킬 것이기 때문에 
-  RGB: false
   ### MEAN, STD는 0.5로 고정으로 가는게 나을 것 같다
   GRAY_MEAN: 0.0 # 0.8 # 0.0 #  0.5
   GRAY_STD: 1.0 # 0.37 # 1.0 # 0.5 
